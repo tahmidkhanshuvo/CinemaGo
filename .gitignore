@@ -1,0 +1,121 @@
+# .NET
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.user
+*.suo
+*.cache
+*.log
+.vs/
+*.rsuser
+*.aps
+*.nupkg
+packages/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio
+.vs/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+**/nuget/*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Entity Framework
+*.db
+*.dbmdl
+*.dbprofiler
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+yarn-integrity.log
+
+# Next.js
+.next/
+out/
+.next/static/
+.next/cache/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Frontend dependencies
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Media files
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Database
+*.bak
+*.sql
+*.sqlite
+
+# Misc
+*.tmp
+*.temp
+*.bak
+*.orig

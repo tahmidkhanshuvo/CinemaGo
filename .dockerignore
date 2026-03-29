@@ -1,0 +1,17 @@
+# .dockerignore
+**/.classpath
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/node_modules
+**/package-lock.json
+**/README.md
+**/RUNNING.md
+**/frontend
+**/*.md
+!CinemaGo.Api/.env
