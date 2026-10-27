@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using CinemaGo.Api.Data;
 using CinemaGo.Api.Models;
@@ -7,23 +8,32 @@ namespace CinemaGo.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/[controller]")]
+[Authorize(Roles = "Admin")]
 public class SeedController : ControllerBase
 {
     private readonly CinemaDbContext _context;
+    private readonly DatabaseInitializer _initializer;
+    private readonly IWebHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
 
-    public SeedController(CinemaDbContext context)
+    public SeedController(CinemaDbContext context, DatabaseInitializer initializer, IWebHostEnvironment environment, IConfiguration configuration)
     {
         _context = context;
+        _initializer = initializer;
+        _environment = environment;
+        _configuration = configuration;
     }
 
     [HttpPost("recreate")]
     public async Task<IActionResult> RecreateDatabase()
     {
+        if (!_environment.IsDevelopment() || !_configuration.GetValue<bool>("Database:AllowReset"))
+            return NotFound();
         try
         {
             // Clear existing data and re-seed
             await ClearAndSeedAsync();
-            
+
             return Ok(new { success = true, message = "Database cleared and reseeded successfully" });
         }
         catch (Exception ex)
@@ -47,11 +57,10 @@ public class SeedController : ControllerBase
         _context.Movies.RemoveRange(_context.Movies);
         _context.Halls.RemoveRange(_context.Halls);
         _context.Users.RemoveRange(_context.Users.Where(u => u.Role == "User"));
-        
+
         await _context.SaveChangesAsync();
-        
+
         // Now seed fresh data
-        var initializer = new DatabaseInitializer();
-        await initializer.SeedDataAsync(_context);
+        await _initializer.SeedDataAsync(_context);
     }
 }

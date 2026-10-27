@@ -119,3 +119,6 @@ coverage/
 *.temp
 *.bak
 *.orig
+CinemaGo.Api/API-Documentation.md
+
+appsettings.*.local.json

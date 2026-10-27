@@ -10,7 +10,7 @@ namespace CinemaGo.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/[controller]")]
-[Authorize]
+[Authorize(Roles = "Admin")]
 public class BulkSeedController : ControllerBase
 {
     private readonly CinemaDbContext _context;
@@ -19,7 +19,7 @@ public class BulkSeedController : ControllerBase
     // Popular movie IDs for seeding (IMDb IDs)
     private static readonly string[] OTT_MOVIE_QUERIES = new[]
     {
-        "action", "comedy", "drama", "thriller", "horror", "sci fi", "romance", 
+        "action", "comedy", "drama", "thriller", "horror", "sci fi", "romance",
         "animation", "adventure", "fantasy", "crime", "mystery", "documentary",
         "marvel", "dc", "batman", "spider man", "iron man", "superhero",
         "star wars", "harry potter", "lord of the rings", "jurassic", "transformers",
@@ -85,7 +85,7 @@ public class BulkSeedController : ControllerBase
                 if (addedMovies.Count >= count) break;
 
                 var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{query}.json");
-                
+
                 if (!response.IsSuccessStatusCode) continue;
 
                 var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
@@ -108,8 +108,8 @@ public class BulkSeedController : ControllerBase
                 }
             }
 
-            return Ok(new { 
-                success = true, 
+            return Ok(new {
+                success = true,
                 message = $"Added {addedMovies.Count} OTT movies from IMDb",
                 movies = addedMovies.Take(20)
             });
@@ -133,7 +133,7 @@ public class BulkSeedController : ControllerBase
                 if (addedMovies.Count >= count) break;
 
                 var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{query}.json");
-                
+
                 if (!response.IsSuccessStatusCode) continue;
 
                 var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
@@ -156,8 +156,8 @@ public class BulkSeedController : ControllerBase
                 }
             }
 
-            return Ok(new { 
-                success = true, 
+            return Ok(new {
+                success = true,
                 message = $"Added {addedMovies.Count} CINEMA movies from IMDb",
                 movies = addedMovies
             });
@@ -181,7 +181,7 @@ public class BulkSeedController : ControllerBase
                 if (addedMovies.Count >= count) break;
 
                 var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{query}.json");
-                
+
                 if (!response.IsSuccessStatusCode) continue;
 
                 var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
@@ -212,8 +212,8 @@ public class BulkSeedController : ControllerBase
                 }
             }
 
-            return Ok(new { 
-                success = true, 
+            return Ok(new {
+                success = true,
                 message = $"Added {addedMovies.Count} Bangladeshi movies from IMDb",
                 movies = addedMovies
             });
@@ -237,7 +237,7 @@ public class BulkSeedController : ControllerBase
                 if (addedMovies.Count >= count) break;
 
                 var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{query}.json");
-                
+
                 if (!response.IsSuccessStatusCode) continue;
 
                 var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
@@ -260,8 +260,8 @@ public class BulkSeedController : ControllerBase
                 }
             }
 
-            return Ok(new { 
-                success = true, 
+            return Ok(new {
+                success = true,
                 message = $"Added {addedMovies.Count} Classic movies from IMDb",
                 movies = addedMovies
             });
@@ -290,18 +290,18 @@ public class BulkSeedController : ControllerBase
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 };
-                
+
                 _context.Halls.Add(hall);
                 await _context.SaveChangesAsync();
 
                 var categoryIds = new List<int>();
-                var categoriesToCreate = hallRequest.SeatCategories?.Any() == true 
-                    ? hallRequest.SeatCategories 
-                    : new List<CreateSeatCategoryRequest> 
-                    { 
-                        new CreateSeatCategoryRequest { Name = "Regular", FixedExtraPrice = 0 } 
+                var categoriesToCreate = hallRequest.SeatCategories?.Any() == true
+                    ? hallRequest.SeatCategories
+                    : new List<CreateSeatCategoryRequest>
+                    {
+                        new CreateSeatCategoryRequest { Name = "Regular", FixedExtraPrice = 0 }
                     };
-                
+
                 foreach (var category in categoriesToCreate)
                 {
                     var seatCategory = new SeatCategory
@@ -316,7 +316,7 @@ public class BulkSeedController : ControllerBase
                 }
 
                 var rowLabels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
-                
+
                 if (!categoryIds.Any())
                 {
                     var defaultCategory = new SeatCategory
@@ -335,7 +335,7 @@ public class BulkSeedController : ControllerBase
                     string rowLabel = rowLabels[row].ToString();
                     int categoryIndex = categoryIds.Count > 0 ? row * categoryIds.Count / Math.Max(1, hallRequest.TotalRows) : 0;
                     int categoryId = categoryIds.Any() ? categoryIds[categoryIndex] : categoryIds.First();
-                    
+
                     for (int seat = 1; seat <= hallRequest.TotalSeatsPerRow; seat++)
                     {
                         string seatLabel = $"{rowLabel}{seat}";
@@ -351,14 +351,14 @@ public class BulkSeedController : ControllerBase
                         _context.HallSeats.Add(hallSeat);
                     }
                 }
-                
+
                 await _context.SaveChangesAsync();
-                
+
                 createdHalls.Add(new { hall.Id, hall.Name, hall.BranchName });
             }
 
-            return Ok(new { 
-                success = true, 
+            return Ok(new {
+                success = true,
                 message = $"Created {createdHalls.Count} halls",
                 halls = createdHalls
             });
@@ -380,17 +380,17 @@ public class BulkSeedController : ControllerBase
             {
                 var movie = await _context.Movies.FindAsync(showTimeRequest.MovieId);
                 if (movie == null) continue;
-                
+
                 var hall = await _context.Halls.FindAsync(showTimeRequest.HallId);
                 if (hall == null) continue;
-                
+
                 var startTime = showTimeRequest.StartTime;
                 var endTime = startTime.Add(TimeSpan.FromMinutes(showTimeRequest.DurationMinutes));
-                
-                var showDateUtc = showTimeRequest.ShowDate.Kind == DateTimeKind.Utc 
-                    ? showTimeRequest.ShowDate 
+
+                var showDateUtc = showTimeRequest.ShowDate.Kind == DateTimeKind.Utc
+                    ? showTimeRequest.ShowDate
                     : showTimeRequest.ShowDate.ToUniversalTime();
-                
+
                 var showTime = new ShowTime
                 {
                     MovieId = showTimeRequest.MovieId,
@@ -402,15 +402,15 @@ public class BulkSeedController : ControllerBase
                     Status = showTimeRequest.Status,
                     CreatedAt = DateTime.UtcNow
                 };
-                
+
                 _context.ShowTimes.Add(showTime);
                 await _context.SaveChangesAsync();
-                
+
                 createdShowTimes.Add(new { showTime.Id, showTime.MovieId, showTime.HallId, showTime.ShowDate, showTime.StartTime });
             }
 
-            return Ok(new { 
-                success = true, 
+            return Ok(new {
+                success = true,
                 message = $"Created {createdShowTimes.Count} showtimes",
                 showTimes = createdShowTimes
             });
@@ -433,7 +433,7 @@ public class BulkSeedController : ControllerBase
             if (data?.d == null || data.d.Count == 0) return null;
 
             var movie = data.d[0];
-            
+
             string slug = movie.l.ToLower()
                 .Replace(" ", "-")
                 .Replace(":", "")

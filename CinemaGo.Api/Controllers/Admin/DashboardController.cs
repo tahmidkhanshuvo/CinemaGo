@@ -10,41 +10,41 @@ namespace CinemaGo.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/[controller]")]
-[Authorize]
+[Authorize(Roles = "Admin")]
 public class DashboardController : ControllerBase
 {
     private readonly CinemaDbContext _context;
-    
+
     public DashboardController(CinemaDbContext context)
     {
         _context = context;
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<ApiResponse<DashboardDto>>> GetDashboard()
     {
         var totalMovies = await _context.Movies.CountAsync();
         var totalHalls = await _context.Halls.Where(h => h.IsActive).CountAsync();
         var totalUsers = await _context.Users.CountAsync();
-        
+
         var today = DateTime.UtcNow.Date;
         var monthStart = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        
+
         var todayStart = new DateTime(today.Year, today.Month, today.Day, 0, 0, 0, DateTimeKind.Utc);
         var todayEnd = todayStart.AddDays(1);
-        
+
         var todayOrders = await _context.TicketOrders
             .Where(o => o.CreatedAt >= todayStart && o.CreatedAt < todayEnd && o.Status == "Paid")
             .SumAsync(o => o.TotalAmount);
-        
+
         var monthRevenue = await _context.TicketOrders
             .Where(o => o.CreatedAt >= monthStart && o.Status == "Paid")
             .SumAsync(o => o.TotalAmount);
-        
+
         var monthOttRevenue = await _context.OttPurchases
             .Where(o => o.PurchasedAt >= monthStart)
             .SumAsync(o => o.Amount);
-        
+
         var recentOrders = await _context.TicketOrders
             .Include(o => o.User)
             .OrderByDescending(o => o.CreatedAt)
@@ -59,7 +59,7 @@ public class DashboardController : ControllerBase
                 UserName = o.User.FullName
             })
             .ToListAsync();
-        
+
         var dashboard = new DashboardDto
         {
             TotalMovies = totalMovies,
@@ -71,7 +71,7 @@ public class DashboardController : ControllerBase
             MonthTotalRevenue = monthRevenue + monthOttRevenue,
             RecentOrders = recentOrders
         };
-        
+
         return Ok(ApiResponse<DashboardDto>.SuccessResponse("Dashboard data fetched", dashboard));
     }
 }

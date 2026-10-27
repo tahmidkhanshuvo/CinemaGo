@@ -14,12 +14,12 @@ namespace CinemaGo.Api.Controllers.Admin;
 public class BookingsController : ControllerBase
 {
     private readonly CinemaDbContext _context;
-    
+
     public BookingsController(CinemaDbContext context)
     {
         _context = context;
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<AdminBookingDto>>>> GetAllBookings(
         [FromQuery] string? status = null,
@@ -34,22 +34,22 @@ public class BookingsController : ControllerBase
             .ThenInclude(s => s!.Hall)
             .Include(o => o.OrderItems)
             .AsQueryable();
-        
+
         if (!string.IsNullOrEmpty(status))
         {
             query = query.Where(o => o.Status == status);
         }
-        
+
         if (fromDate.HasValue)
         {
             query = query.Where(o => o.CreatedAt >= fromDate);
         }
-        
+
         if (toDate.HasValue)
         {
             query = query.Where(o => o.CreatedAt <= toDate);
         }
-        
+
         var bookings = await query
             .OrderByDescending(o => o.CreatedAt)
             .Select(o => new AdminBookingDto
@@ -69,10 +69,10 @@ public class BookingsController : ControllerBase
                 CreatedAt = o.CreatedAt
             })
             .ToListAsync();
-        
+
         return Ok(ApiResponse<List<AdminBookingDto>>.SuccessResponse("Bookings fetched", bookings));
     }
-    
+
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<AdminBookingDto>>> GetBooking(int id)
     {
@@ -85,12 +85,12 @@ public class BookingsController : ControllerBase
             .Include(o => o.OrderItems)
             .Include(o => o.Payment)
             .FirstOrDefaultAsync(o => o.Id == id);
-        
+
         if (order == null)
         {
             return NotFound(ApiResponse<AdminBookingDto>.ErrorResponse("Booking not found"));
         }
-        
+
         var dto = new AdminBookingDto
         {
             Id = order.Id,
@@ -109,41 +109,43 @@ public class BookingsController : ControllerBase
             PaymentMethod = order.Payment?.Method,
             TransactionCode = order.Payment?.TransactionCode
         };
-        
+
         return Ok(ApiResponse<AdminBookingDto>.SuccessResponse("Booking fetched", dto));
     }
-    
+
     [HttpPut("{id}/cancel")]
     public async Task<ActionResult<ApiResponse<string>>> CancelBooking(int id)
     {
         var order = await _context.TicketOrders
             .Include(o => o.OrderItems)
             .FirstOrDefaultAsync(o => o.Id == id);
-        
+
         if (order == null)
         {
             return NotFound(ApiResponse<string>.ErrorResponse("Booking not found"));
         }
-        
+
         if (order.Status == "Cancelled")
         {
             return BadRequest(ApiResponse<string>.ErrorResponse("Booking already cancelled"));
         }
-        
+
         order.Status = "Cancelled";
-        
+
         // Release seat reservations
+        var orderSeatIds = order.OrderItems.Select(item => item.SeatId).ToList();
         var reservations = await _context.SeatReservations
-            .Where(r => r.ShowTimeId == order.ShowTimeId && r.UserId == order.UserId && r.Status == "Booked")
+            .Where(r => r.ShowTimeId == order.ShowTimeId && r.UserId == order.UserId &&
+                orderSeatIds.Contains(r.SeatId) && r.Status == "Booked")
             .ToListAsync();
-        
+
         foreach (var reservation in reservations)
         {
             reservation.Status = "Cancelled";
         }
-        
+
         await _context.SaveChangesAsync();
-        
+
         return Ok(ApiResponse<string>.SuccessResponse("Booking cancelled"));
     }
 }

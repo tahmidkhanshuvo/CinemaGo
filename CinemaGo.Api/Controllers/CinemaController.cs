@@ -13,12 +13,12 @@ namespace CinemaGo.Api.Controllers;
 public class CinemaController : ControllerBase
 {
     private readonly CinemaDbContext _context;
-    
+
     public CinemaController(CinemaDbContext context)
     {
         _context = context;
     }
-    
+
     [HttpGet("showtimes")]
     public async Task<ActionResult<ApiResponse<List<ShowTimeDto>>>> GetShowTimes(
         [FromQuery] int? movieId = null,
@@ -29,7 +29,7 @@ public class CinemaController : ControllerBase
             .Include(s => s.Movie)
             .Include(s => s.Hall)
             .Where(s => s.Status != "Cancelled");
-        
+
         if (movieId.HasValue)
             query = query.Where(s => s.MovieId == movieId.Value);
         if (hallId.HasValue)
@@ -41,7 +41,7 @@ public class CinemaController : ControllerBase
             var dateEnd = dateValue.AddDays(1);
             query = query.Where(s => s.ShowDate >= dateValue && s.ShowDate < dateEnd);
         }
-        
+
         // Get showtimes with available seats count
         var showTimeIds = await query.Select(s => s.Id).ToListAsync();
         var reservedCounts = await _context.SeatReservations
@@ -49,12 +49,12 @@ public class CinemaController : ControllerBase
             .GroupBy(r => r.ShowTimeId)
             .Select(g => new { ShowTimeId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ShowTimeId, x => x.Count);
-        
+
         var hallSeats = await _context.Halls
             .Where(h => query.Select(s => s.HallId).Contains(h.Id))
             .Select(h => new { HallId = h.Id, TotalSeats = h.TotalRows * h.TotalSeatsPerRow })
             .ToDictionaryAsync(x => x.HallId, x => x.TotalSeats);
-        
+
         var showTimes = await query
             .OrderBy(s => s.ShowDate)
             .ThenBy(s => s.StartTime)
@@ -75,7 +75,7 @@ public class CinemaController : ControllerBase
                 AvailableSeats = 0 // Will be set below
             })
             .ToListAsync();
-        
+
         // Set available seats
         foreach (var st in showTimes)
         {
@@ -83,10 +83,10 @@ public class CinemaController : ControllerBase
             var reserved = reservedCounts.GetValueOrDefault(st.Id, 0);
             st.AvailableSeats = totalSeats - reserved;
         }
-        
+
         return Ok(ApiResponse<List<ShowTimeDto>>.SuccessResponse("Showtimes fetched", showTimes));
     }
-    
+
     [HttpGet("showtimes/{id}")]
     public async Task<ActionResult<ApiResponse<ShowTimeWithSeatsDto>>> GetShowTimeWithSeats(int id)
     {
@@ -94,18 +94,18 @@ public class CinemaController : ControllerBase
             .Include(s => s.Movie)
             .Include(s => s.Hall)
             .FirstOrDefaultAsync(s => s.Id == id);
-        
+
         if (showTime == null)
         {
             return NotFound(ApiResponse<ShowTimeWithSeatsDto>.ErrorResponse("Showtime not found"));
         }
-        
+
         // Get reserved seats
         var reservedSeatIds = await _context.SeatReservations
             .Where(r => r.ShowTimeId == id && r.Status == "Booked")
             .Select(r => r.SeatId)
             .ToListAsync();
-        
+
         // Get all seats for the hall
         var seats = await _context.HallSeats
             .Include(s => s.Category)
@@ -124,7 +124,7 @@ public class CinemaController : ControllerBase
                 IsAvailable = !reservedSeatIds.Contains(s.Id)
             })
             .ToListAsync();
-        
+
         var categories = await _context.SeatCategories
             .Where(c => c.HallId == showTime.HallId)
             .Select(c => new SeatCategoryDto
@@ -135,7 +135,7 @@ public class CinemaController : ControllerBase
                 FixedExtraPrice = c.FixedExtraPrice
             })
             .ToListAsync();
-        
+
         var result = new ShowTimeWithSeatsDto
         {
             Id = showTime.Id,
@@ -153,10 +153,10 @@ public class CinemaController : ControllerBase
             Categories = categories,
             ReservedSeatIds = reservedSeatIds
         };
-        
+
         return Ok(ApiResponse<ShowTimeWithSeatsDto>.SuccessResponse("Showtime fetched", result));
     }
-    
+
     [HttpPost("book")]
     [Authorize]
     public async Task<ActionResult<ApiResponse<BookingResponseDto>>> BookTickets([FromBody] BookingRequestDto request)
@@ -166,23 +166,40 @@ public class CinemaController : ControllerBase
         {
             return Unauthorized(ApiResponse<BookingResponseDto>.ErrorResponse("Unauthorized"));
         }
-        
+
+        if (request.SeatIds == null || request.SeatIds.Count == 0 || request.SeatIds.Count > 10 ||
+            request.SeatIds.Distinct().Count() != request.SeatIds.Count)
+        {
+            return BadRequest(ApiResponse<BookingResponseDto>.ErrorResponse("Select between 1 and 10 different seats."));
+        }
+
+        // Serialize bookings across application instances; roll back every write together.
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({request.ShowTimeId})");
+
         // Get showtime
         var showTime = await _context.ShowTimes
             .Include(s => s.Movie)
+            .Include(s => s.Hall)
             .FirstOrDefaultAsync(s => s.Id == request.ShowTimeId);
-        
+
         if (showTime == null)
         {
             return NotFound(ApiResponse<BookingResponseDto>.ErrorResponse("Showtime not found"));
         }
-        
+
+        if (showTime.Status != "Scheduled" || !showTime.Movie.IsPublished || !showTime.Hall.IsActive || showTime.ShowDate.Date.Add(showTime.StartTime) <= DateTime.UtcNow)
+        {
+            return BadRequest(ApiResponse<BookingResponseDto>.ErrorResponse("This showtime is no longer available for booking."));
+        }
+
         // Check seat availability
         var reservedSeatIds = await _context.SeatReservations
             .Where(r => r.ShowTimeId == request.ShowTimeId && r.Status == "Booked")
             .Select(r => r.SeatId)
             .ToListAsync();
-        
+
         foreach (var seatId in request.SeatIds)
         {
             if (reservedSeatIds.Contains(seatId))
@@ -190,19 +207,24 @@ public class CinemaController : ControllerBase
                 return BadRequest(ApiResponse<BookingResponseDto>.ErrorResponse($"Seat {seatId} is already booked"));
             }
         }
-        
+
         // Get seat details and calculate price
         var seats = await _context.HallSeats
             .Include(s => s.Category)
-            .Where(s => request.SeatIds.Contains(s.Id))
+            .Where(s => request.SeatIds.Contains(s.Id) && s.HallId == showTime.HallId && s.IsActive)
             .ToListAsync();
-        
+
+        if (seats.Count != request.SeatIds.Count)
+        {
+            return BadRequest(ApiResponse<BookingResponseDto>.ErrorResponse("One or more seats do not belong to this hall or are unavailable."));
+        }
+
         decimal totalAmount = 0;
         foreach (var seat in seats)
         {
             totalAmount += showTime.BasePrice + seat.Category.FixedExtraPrice;
         }
-        
+
         // Create payment
         var payment = new Payment
         {
@@ -217,10 +239,10 @@ public class CinemaController : ControllerBase
         };
         _context.Payments.Add(payment);
         await _context.SaveChangesAsync();
-        
+
         // Generate booking code
         var bookingCode = "CG" + Guid.NewGuid().ToString("N")[..8].ToUpper();
-        
+
         // Create ticket order
         var order = new TicketOrder
         {
@@ -234,12 +256,13 @@ public class CinemaController : ControllerBase
         };
         _context.TicketOrders.Add(order);
         await _context.SaveChangesAsync();
-        
+        payment.ReferenceId = order.Id;
+
         // Create order items and seat reservations
         foreach (var seat in seats)
         {
             var unitPrice = showTime.BasePrice + seat.Category.FixedExtraPrice;
-            
+
             _context.TicketOrderItems.Add(new TicketOrderItem
             {
                 TicketOrderId = order.Id,
@@ -247,7 +270,7 @@ public class CinemaController : ControllerBase
                 SeatLabel = seat.SeatLabel,
                 UnitPrice = unitPrice
             });
-            
+
             _context.SeatReservations.Add(new SeatReservation
             {
                 ShowTimeId = request.ShowTimeId,
@@ -258,9 +281,11 @@ public class CinemaController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             });
         }
-        
+
         await _context.SaveChangesAsync();
-        
+
+        await transaction.CommitAsync();
+
         var response = new BookingResponseDto
         {
             OrderId = order.Id,
@@ -271,7 +296,7 @@ public class CinemaController : ControllerBase
             ShowDate = showTime.ShowDate,
             SeatLabels = seats.Select(s => s.SeatLabel).ToList()
         };
-        
+
         return Ok(ApiResponse<BookingResponseDto>.SuccessResponse("Booking successful", response));
     }
 }

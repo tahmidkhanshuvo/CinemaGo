@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -34,7 +35,7 @@ export default function TicketsPage() {
       try {
         const response = await api.getTickets() as any;
         if (response.success && response.data) {
-          setTickets(response.data);
+          setTickets(response.data.ticketOrders ?? []);
         }
       } catch (error) {
         console.error('Error fetching tickets:', error);
@@ -57,9 +58,9 @@ export default function TicketsPage() {
       ) : tickets.length === 0 ? (
         <div className="bg-gray-800 rounded-lg p-8 text-center">
           <p className="text-gray-400">No cinema tickets yet</p>
-          <a href="/cinema" className="text-red-500 hover:text-red-400 mt-2 inline-block">
+          <Link href="/cinema" className="text-red-500 hover:text-red-400 mt-2 inline-block">
             Browse cinema movies
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
@@ -72,14 +73,14 @@ export default function TicketsPage() {
                 </div>
                 <div className="text-right">
                   <span className={`px-3 py-1 rounded text-sm ${
-                    ticket.status === 'Paid' ? 'bg-green-600' : 
+                    ticket.status === 'Paid' ? 'bg-green-600' :
                     ticket.status === 'Pending' ? 'bg-yellow-600' : 'bg-red-600'
                   } text-white`}>
                     {ticket.status}
                   </span>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-gray-500">Date</p>
@@ -98,7 +99,7 @@ export default function TicketsPage() {
                   <p className="text-white font-bold">${ticket.totalAmount}</p>
                 </div>
               </div>
-              
+
               <div className="mt-4 pt-4 border-t border-gray-700">
                 <p className="text-gray-500 text-sm">Booking Code: <span className="text-white font-mono">{ticket.bookingCode}</span></p>
               </div>

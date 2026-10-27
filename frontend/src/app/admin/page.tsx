@@ -82,11 +82,11 @@ export default function AdminPage() {
               <div className="text-2xl font-bold text-white">{dashboard.totalUsers}</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Today's Ticket Revenue</div>
+              <div className="text-gray-400 text-sm">Today&apos;s Ticket Revenue</div>
               <div className="text-2xl font-bold text-green-400">${(dashboard.todayTicketRevenue ?? 0).toFixed(2)}</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4">
-              <div className="text-gray-400 text-sm">Today's OTT Revenue</div>
+              <div className="text-gray-400 text-sm">Today&apos;s OTT Revenue</div>
               <div className="text-2xl font-bold text-blue-400">${(dashboard.monthOttRevenue ?? 0).toFixed(2)}</div>
             </div>
           </div>

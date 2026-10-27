@@ -1,189 +1,114 @@
-# CinemaGo - Movie Platform
+<div align="center">
 
-A full-stack movie platform with OTT streaming and cinema ticket booking capabilities, built with ASP.NET Core Web API and Next.js.
+# CinemaGo
 
-![CinemaGo](https://img.shields.io/badge/.NET-8.0-blue) ![Next.js](https://img.shields.io/badge/Next.js-14-black) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791)
+### A seat. A screen. A great story.
+
+Discover films, choose cinema seats, and keep your streaming library and tickets together.
+
+[Live demo](https://cinemago.tahmidkhan.com.bd) · [Report an issue](https://github.com/tahmidkhanshuvo/CinemaGo/issues)
+
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs) ![React](https://img.shields.io/badge/React-19-61dafb?logo=react) ![.NET](https://img.shields.io/badge/.NET-10-512bd4?logo=dotnet) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169e1?logo=postgresql)
+
+</div>
+
+![CinemaGo homepage](docs/screenshots/home.jpg)
+
+CinemaGo is an educational full-stack application by Tahmid Khan. Payments are simulated: the application records demo purchases and bookings without processing real cards. Configure media URLs only for content you are authorized to distribute. Free hosting may take a moment to wake after inactivity.
 
 ## Features
 
-### 🎬 OTT Platform
-- Browse and search movies
-- Purchase individual movies
-- Watch purchased movies
-- Rate movies (1-10 scale)
+- A responsive movie homepage driven by the actual catalogue, with featured films, streaming titles, now-showing and upcoming shelves.
+- Movie search and details, cinema showtimes, hall seat maps and server-calculated ticket prices.
+- Account registration/sign-in, profile management, ticket history, streaming purchases and an owned library.
+- Purchase-checked playback URLs and movie ratings.
+- Administrator tools for movies, halls, showtimes and booking cancellation; every administrator controller requires the Admin role.
 
-### 🎟️ Cinema Booking
-- Browse currently showing movies
-- View showtimes by date and branch
-- Interactive seat selection
-- Multiple seat categories (Regular, Premium, VIP, Recliner)
-- Real-time seat availability
+Seat booking runs in a PostgreSQL transaction with a per-showtime advisory lock. Competing requests cannot book the same seat. Cancellation releases only the seats belonging to that order. Streaming purchase/payment writes are atomic and serialized per account/movie. Unpublished and cinema-only films cannot be purchased as streaming titles. Public catalogue responses omit playback URLs.
 
-### 👥 User Features
-- User registration and login
-- Profile management
-- Purchase history (OTT)
-- Ticket history (Cinema)
-- Movie ratings
+## Run locally
 
-### ⚙️ Admin Features
-- Dashboard with statistics
-- Movie management (OTT & Cinema)
-- Hall management with seat layouts
-- Showtime scheduling
-- Booking management
+Install **.NET SDK 10**, **Node.js 22**, and PostgreSQL. Use a dedicated development database.
 
-## Tech Stack
+Set API environment variables from the root `.env.example` in your shell or IDE. ASP.NET reads environment variables directly; it does not automatically load that example as a dotenv file. An ignored `CinemaGo.Api/appsettings.Development.local.json` may instead hold development-only settings using the same structure as `appsettings.json`.
 
-### Backend
-- ASP.NET Core 8.0
-- Entity Framework Core
-- PostgreSQL
-- JWT Authentication
-- Role-based Authorization
-
-### Frontend
-- Next.js 14 (App Router)
-- Tailwind CSS
-- Zustand (State Management)
-- TypeScript
-
-## Project Structure
-
-```
-CinemaGo/
-├── CinemaGo.Api/          # ASP.NET Core Backend
-│   ├── Controllers/       # API Controllers
-│   ├── Models/            # Entity Models
-│   ├── DTOs/              # Data Transfer Objects
-│   ├── Services/          # Business Logic
-│   ├── Data/              # DbContext & Migrations
-│   └── ...
-├── frontend/              # Next.js Frontend
-│   ├── src/
-│   │   ├── app/          # Pages
-│   │   ├── components/   # React Components
-│   │   ├── lib/          # Utilities
-│   │   └── store/        # State Management
-│   └── ...
-├── Dockerfile             # Docker configuration
-├── DEPLOYMENT.md         # Deployment guide
-└── README.md
+```sh
+# Configure ConnectionStrings__DefaultConnection and Jwt__SecretKey first.
+dotnet restore CinemaGo.Api
+dotnet run --project CinemaGo.Api --no-launch-profile --urls http://localhost:5000
 ```
 
-## Getting Started
+For a local JSON override, set `ASPNETCORE_ENVIRONMENT=Development`. Use a random signing secret of at least 32 bytes. No built-in database password or signing secret is supplied.
 
-### Prerequisites
-- Node.js 18+
-- .NET 8 SDK
-- PostgreSQL (local or cloud)
+```sh
+cd frontend
+npm ci
+cp .env.example .env.local
+npm run dev
+```
 
-### Local Development
+Open `http://localhost:3000`. The frontend variable includes the `/api` suffix. Its value is public; private database and signing credentials belong only in the API process.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/cinemago.git
-   cd cinemago
-   ```
+## Database and administrator setup
 
-2. **Set up the Backend**
-   ```bash
-   cd CinemaGo.Api
-   
-   # Update appsettings.json with your database connection
-   # "ConnectionStrings": {
-   #   "DefaultConnection": "Host=localhost;Database=cinemago;Username=postgres;Password=yourpassword"
-   # }
-   
-   dotnet restore
-   dotnet run
-   ```
+Startup preserves existing data and ensures the schema exists. It does not reset the database or seed demo accounts automatically. To populate a **new development database**, explicitly set `Database__SeedDemoData=true`, `Bootstrap__AdminEmail`, and a unique `Bootstrap__AdminPassword` of at least 12 characters. Seeding adds catalogue/hall/showtime data; turn the flag off after the initial setup. Existing accounts are not reset.
 
-3. **Set up the Frontend**
-   ```bash
-   cd frontend
-   
-   # Create .env.local
-   # NEXT_PUBLIC_API_URL=http://localhost:5000/api
-   
-   npm install
-   npm run dev
-   ```
+The legacy reset route is restricted to authenticated administrators, Development mode, and explicit `Database__AllowReset=true`. Leave that flag false. Previously published credentials remain in repository history and must be rotated at their providers; removing them from current source does not revoke them.
 
-4. **Open the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000/api
+## Configuration
+
+| Variable | Location | Purpose |
+| --- | --- | --- |
+| `ConnectionStrings__DefaultConnection` | API | Npgsql connection string; require TLS for a hosted database |
+| `Jwt__SecretKey` | API | Required server-only signing secret, at least 32 bytes |
+| `Jwt__ExpiryHours` | API | Token configuration; default token lifetime is 24 hours |
+| `ASPNETCORE_ENVIRONMENT` | API | Production on hosting; Development only locally |
+| `ASPNETCORE_URLS` | API | Listener; Docker exposes port 8080 |
+| `Database__SeedDemoData` | API | Explicit initial demo data, off by default |
+| `Bootstrap__AdminEmail`, `Bootstrap__AdminPassword` | API | Explicit first administrator for demo seeding |
+| `NEXT_PUBLIC_API_URL` | Frontend | Public API URL including `/api` |
+
+## Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| `CinemaGo.Api/Controllers` | Public catalogue, auth, booking, OTT, profile and ratings |
+| `CinemaGo.Api/Controllers/Admin` | Role-restricted management APIs |
+| `CinemaGo.Api/Data` | EF Core mappings and explicit initial-data setup |
+| `CinemaGo.Api/Models`, `DTOs` | Persistence entities and API response contracts |
+| `frontend/src/app` | Next.js public, account, cinema, streaming and admin routes |
+| `frontend/src/lib/api.ts` | Shared API client with bounded requests |
+| `tests/CinemaGo.WorkflowChecks` | PostgreSQL-backed concurrency and ownership checks |
+
+## API landmarks
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /healthz` | Database-aware readiness |
+| `POST /api/auth/register`, `/api/auth/login` | Account access |
+| `GET /api/movies/home`, `/api/movies`, `/api/movies/{slug}` | Public catalogue |
+| `GET /api/cinema/showtimes`, `/api/cinema/showtimes/{id}` | Showtimes and seats |
+| `POST /api/cinema/book` | Authenticated demo ticket booking |
+| `POST /api/ott/{movieId}/purchase` | Atomic demo streaming purchase |
+| `GET /api/ott/purchases`, `/api/ott/{movieId}/watch` | Owned library and authorized playback |
+| `GET /api/profile/purchases` | Envelope containing both `ottPurchases` and `ticketOrders` |
+| `/api/admin/*` | Admin role required |
+
+## Verification
+
+```sh
+dotnet build CinemaGo.Api
+# Set CINEMAGO_TEST_CONNECTION to a PostgreSQL test connection.
+dotnet run --project tests/CinemaGo.WorkflowChecks
+cd frontend
+npm run lint
+npm run build
+```
+
+The workflow checks create an explicitly qualified, uniquely named `cinemago_test_*` schema and remove only that schema afterward. They exercise concurrent booking, foreign-hall/duplicate seat rejection, price/payment consistency, cancellation isolation, unpublished-title restrictions, purchase ownership, concurrent OTT purchases and administrator role declarations. CI uses its own PostgreSQL service. Frontend lint currently reports legacy type/effect warnings; there are no lint errors.
 
 ## Deployment
 
-### Deploy to Production
+The existing Render Docker service builds `CinemaGo.Api/Dockerfile` with the repository root as its context. Set API secrets in Render and use `/healthz` for readiness. The existing Vercel project uses root `frontend`, the Next.js preset, and `NEXT_PUBLIC_API_URL=https://cinemago-bpdf.onrender.com/api`.
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
-
-**Quick Summary:**
-1. **Database:** Create a PostgreSQL database on [Neon](https://neon.tech)
-2. **Backend:** Deploy to [Render](https://render.com) using Docker
-3. **Frontend:** Deploy to [Vercel](https://vercel.com)
-
-### Environment Variables
-
-**Backend (appsettings.json):**
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "postgresql://..."
-  },
-  "Jwt": {
-    "Key": "YourSecretKey123!",
-    "Issuer": "CinemaGo",
-    "Audience": "CinemaGoUsers"
-  }
-}
-```
-
-**Frontend (.env.local):**
-```
-NEXT_PUBLIC_API_URL=https://your-backend-api.com/api
-```
-
-## Default Login
-
-After seeding, you can log in with:
-
-| Role  | Email              | Password |
-|-------|--------------------|----------|
-| Admin | admin@cinemago.com | admin123 |
-| User  | user@cinemago.com  | user123  |
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login
-- `GET /api/auth/me` - Get current user
-
-### Movies
-- `GET /api/movies/home` - Get homepage data
-- `GET /api/movies` - List movies
-- `GET /api/movies/{slug}` - Get movie details
-
-### Cinema
-- `GET /api/cinema/showtimes` - Get showtimes
-- `GET /api/cinema/showtimes/{id}` - Get seats
-- `POST /api/cinema/book` - Book tickets
-
-### OTT
-- `POST /api/ott/purchase` - Purchase movie
-- `GET /api/ott/library` - Get purchased movies
-- `GET /api/ott/watch/{id}` - Get video URL
-
-### Admin
-- `GET /api/admin/dashboard` - Dashboard stats
-- `GET /api/admin/movies` - Manage movies
-- `GET /api/admin/halls` - Manage halls
-- `GET /api/admin/showtimes` - Manage showtimes
-- `GET /api/admin/bookings` - View bookings
-
-## License
-
-MIT License - see LICENSE for details.
+After deployment, verify catalogue loading, account access, seat selection, ticket history, owned-library playback and administrator access. Preserve existing data and retain the previous successful deployment for rollback. Use disposable test data for write checks. Payments in this project remain a demo.

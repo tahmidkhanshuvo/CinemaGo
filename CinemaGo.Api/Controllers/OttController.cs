@@ -14,12 +14,12 @@ namespace CinemaGo.Api.Controllers;
 public class OttController : ControllerBase
 {
     private readonly CinemaDbContext _context;
-    
+
     public OttController(CinemaDbContext context)
     {
         _context = context;
     }
-    
+
     [HttpPost("{movieId}/purchase")]
     public async Task<ActionResult<ApiResponse<OttPurchaseDto>>> PurchaseMovie(int movieId)
     {
@@ -28,26 +28,31 @@ public class OttController : ControllerBase
         {
             return Unauthorized(ApiResponse<OttPurchaseDto>.ErrorResponse("Unauthorized"));
         }
-        
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        // One purchase/payment per account and movie, even across API instances.
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({userId}, {movieId})");
+
         // Get movie
         var movie = await _context.Movies.FindAsync(movieId);
-        
-        if (movie == null)
+
+        if (movie == null || !movie.IsPublished || (movie.MovieType != "OTT" && movie.MovieType != "BOTH"))
         {
             return NotFound(ApiResponse<OttPurchaseDto>.ErrorResponse("Movie not found"));
         }
-        
+
         // Check if already purchased
         var existingPurchase = await _context.OttPurchases
             .FirstOrDefaultAsync(p => p.UserId == userId && p.MovieId == movieId);
-        
+
         if (existingPurchase != null)
         {
             return BadRequest(ApiResponse<OttPurchaseDto>.ErrorResponse("Movie already purchased"));
         }
-        
+
         var amount = movie.OttPrice;
-        
+
         // Create payment
         var payment = new Payment
         {
@@ -62,7 +67,7 @@ public class OttController : ControllerBase
         };
         _context.Payments.Add(payment);
         await _context.SaveChangesAsync();
-        
+
         // Create purchase
         var purchase = new OttPurchase
         {
@@ -74,7 +79,10 @@ public class OttController : ControllerBase
         };
         _context.OttPurchases.Add(purchase);
         await _context.SaveChangesAsync();
-        
+        payment.ReferenceId = purchase.Id;
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
         var purchaseDto = new OttPurchaseDto
         {
             Id = purchase.Id,
@@ -84,10 +92,10 @@ public class OttController : ControllerBase
             Amount = amount,
             PurchasedAt = purchase.PurchasedAt
         };
-        
+
         return Ok(ApiResponse<OttPurchaseDto>.SuccessResponse("Purchase successful", purchaseDto));
     }
-    
+
     [HttpGet("purchases")]
     public async Task<ActionResult<ApiResponse<List<OttPurchaseDto>>>> GetPurchases()
     {
@@ -96,7 +104,7 @@ public class OttController : ControllerBase
         {
             return Unauthorized(ApiResponse<List<OttPurchaseDto>>.ErrorResponse("Unauthorized"));
         }
-        
+
         var purchases = await _context.OttPurchases
             .Include(p => p.Movie)
             .Where(p => p.UserId == userId)
@@ -111,10 +119,10 @@ public class OttController : ControllerBase
                 PurchasedAt = p.PurchasedAt
             })
             .ToListAsync();
-        
+
         return Ok(ApiResponse<List<OttPurchaseDto>>.SuccessResponse("Purchases fetched", purchases));
     }
-    
+
     [HttpGet("{movieId}/watch")]
     public async Task<ActionResult<ApiResponse<WatchDto>>> WatchMovie(int movieId)
     {
@@ -123,18 +131,18 @@ public class OttController : ControllerBase
         {
             return Unauthorized(ApiResponse<WatchDto>.ErrorResponse("Unauthorized"));
         }
-        
+
         // Check if purchased
         var purchase = await _context.OttPurchases
             .FirstOrDefaultAsync(p => p.UserId == userId && p.MovieId == movieId);
-        
+
         if (purchase == null)
         {
             return BadRequest(ApiResponse<WatchDto>.ErrorResponse("Movie not purchased"));
         }
-        
+
         var movie = await _context.Movies.FindAsync(movieId);
-        
+
         var watchDto = new WatchDto
         {
             MovieId = movieId,
@@ -143,7 +151,7 @@ public class OttController : ControllerBase
             VideoUrl = movie?.VideoUrl ?? "",
             PosterUrl = movie?.PosterUrl ?? ""
         };
-        
+
         return Ok(ApiResponse<WatchDto>.SuccessResponse("Watch URL fetched", watchDto));
     }
 }

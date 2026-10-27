@@ -30,14 +30,14 @@ export default function WatchMoviePage() {
 
     const fetchMovie = async () => {
       try {
-        const response = await api.getMovieById(Number(params.movieId)) as any;
+        const response = await api.watchMovie(Number(params.movieId)) as any;
         if (response.success && response.data) {
           setMovie(response.data);
         } else {
           setError('Movie not found');
         }
       } catch (err) {
-        setError('Failed to load movie');
+        setError(err instanceof Error ? err.message : 'Failed to load movie');
       } finally {
         setLoading(false);
       }
@@ -56,7 +56,7 @@ export default function WatchMoviePage() {
       </div>
     </div>
   );
-  
+
   if (error) return (
     <div className="min-h-screen bg-black">
       <Navbar />
@@ -65,7 +65,7 @@ export default function WatchMoviePage() {
       </div>
     </div>
   );
-  
+
   if (!movie) return (
     <div className="min-h-screen bg-black">
       <Navbar />
@@ -78,10 +78,10 @@ export default function WatchMoviePage() {
   return (
     <div className="min-h-screen bg-black">
       <Navbar />
-      
+
       {/* Header */}
       <div className="bg-gray-900 p-4">
-        <button 
+        <button
           onClick={() => router.back()}
           className="text-white hover:text-red-500"
         >
@@ -92,8 +92,8 @@ export default function WatchMoviePage() {
       {/* Video Player */}
       <div className="w-full aspect-video bg-black">
         {movie.videoUrl ? (
-          <video 
-            controls 
+          <video
+            controls
             autoPlay
             className="w-full h-full"
             src={movie.videoUrl}

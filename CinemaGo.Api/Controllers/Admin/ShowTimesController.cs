@@ -14,12 +14,12 @@ namespace CinemaGo.Api.Controllers.Admin;
 public class ShowTimesController : ControllerBase
 {
     private readonly CinemaDbContext _context;
-    
+
     public ShowTimesController(CinemaDbContext context)
     {
         _context = context;
     }
-    
+
     [HttpGet]
     public async Task<ActionResult<ApiResponse<List<AdminShowTimeDto>>>> GetAllShowTimes(
         [FromQuery] int? movieId = null,
@@ -30,22 +30,22 @@ public class ShowTimesController : ControllerBase
             .Include(s => s.Movie)
             .Include(s => s.Hall)
             .AsQueryable();
-        
+
         if (movieId.HasValue)
         {
             query = query.Where(s => s.MovieId == movieId);
         }
-        
+
         if (hallId.HasValue)
         {
             query = query.Where(s => s.HallId == hallId);
         }
-        
+
         if (date.HasValue)
         {
             query = query.Where(s => s.ShowDate.Date == date.Value.Date);
         }
-        
+
         var showTimes = await query
             .OrderBy(s => s.ShowDate)
             .ThenBy(s => s.StartTime)
@@ -64,10 +64,10 @@ public class ShowTimesController : ControllerBase
                 BookedSeats = s.Reservations.Count(r => r.Status == "Booked")
             })
             .ToListAsync();
-        
+
         return Ok(ApiResponse<List<AdminShowTimeDto>>.SuccessResponse("Showtimes fetched", showTimes));
     }
-    
+
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<AdminShowTimeDto>>> GetShowTime(int id)
     {
@@ -75,12 +75,12 @@ public class ShowTimesController : ControllerBase
             .Include(s => s.Movie)
             .Include(s => s.Hall)
             .FirstOrDefaultAsync(s => s.Id == id);
-        
+
         if (showTime == null)
         {
             return NotFound(ApiResponse<AdminShowTimeDto>.ErrorResponse("Showtime not found"));
         }
-        
+
         var dto = new AdminShowTimeDto
         {
             Id = showTime.Id,
@@ -95,10 +95,10 @@ public class ShowTimesController : ControllerBase
             Status = showTime.Status,
             BookedSeats = showTime.Reservations.Count(r => r.Status == "Booked")
         };
-        
+
         return Ok(ApiResponse<AdminShowTimeDto>.SuccessResponse("Showtime fetched", dto));
     }
-    
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<AdminShowTimeDto>>> CreateShowTime([FromBody] CreateShowTimeRequest request)
     {
@@ -107,36 +107,36 @@ public class ShowTimesController : ControllerBase
         {
             return NotFound(ApiResponse<AdminShowTimeDto>.ErrorResponse("Movie not found"));
         }
-        
+
         var hall = await _context.Halls.FindAsync(request.HallId);
         if (hall == null)
         {
             return NotFound(ApiResponse<AdminShowTimeDto>.ErrorResponse("Hall not found"));
         }
-        
+
         var startTime = request.StartTime;
         var endTime = startTime.Add(TimeSpan.FromMinutes(request.DurationMinutes));
-        
+
         // Convert ShowDate to UTC for PostgreSQL compatibility
-        var showDateUtc = request.ShowDate.Kind == DateTimeKind.Utc 
-            ? request.ShowDate 
+        var showDateUtc = request.ShowDate.Kind == DateTimeKind.Utc
+            ? request.ShowDate
             : request.ShowDate.ToUniversalTime();
-        
+
         // Check for conflicts
         var conflicts = await _context.ShowTimes
-            .Where(s => s.HallId == request.HallId 
+            .Where(s => s.HallId == request.HallId
                 && s.ShowDate.Date == showDateUtc.Date
                 && s.Status != "Cancelled"
                 && ((s.StartTime <= startTime && startTime < s.EndTime)
                     || (s.StartTime < endTime && endTime <= s.EndTime)
                     || (startTime <= s.StartTime && s.EndTime <= endTime)))
             .AnyAsync();
-        
+
         if (conflicts)
         {
             return BadRequest(ApiResponse<AdminShowTimeDto>.ErrorResponse("Time slot conflicts with existing showtime"));
         }
-        
+
         var showTime = new ShowTime
         {
             MovieId = request.MovieId,
@@ -148,10 +148,10 @@ public class ShowTimesController : ControllerBase
             Status = "Scheduled",
             CreatedAt = DateTime.UtcNow
         };
-        
+
         _context.ShowTimes.Add(showTime);
         await _context.SaveChangesAsync();
-        
+
         var dto = new AdminShowTimeDto
         {
             Id = showTime.Id,
@@ -166,10 +166,10 @@ public class ShowTimesController : ControllerBase
             Status = showTime.Status,
             BookedSeats = 0
         };
-        
+
         return Ok(ApiResponse<AdminShowTimeDto>.SuccessResponse("Showtime created", dto));
     }
-    
+
     [HttpPut("{id}")]
     public async Task<ActionResult<ApiResponse<AdminShowTimeDto>>> UpdateShowTime(int id, [FromBody] UpdateShowTimeRequest request)
     {
@@ -177,24 +177,24 @@ public class ShowTimesController : ControllerBase
             .Include(s => s.Movie)
             .Include(s => s.Hall)
             .FirstOrDefaultAsync(s => s.Id == id);
-        
+
         if (showTime == null)
         {
             return NotFound(ApiResponse<AdminShowTimeDto>.ErrorResponse("Showtime not found"));
         }
-        
+
         if (request.Status != null)
         {
             showTime.Status = request.Status;
         }
-        
+
         if (request.BasePrice.HasValue)
         {
             showTime.BasePrice = request.BasePrice.Value;
         }
-        
+
         await _context.SaveChangesAsync();
-        
+
         var dto = new AdminShowTimeDto
         {
             Id = showTime.Id,
@@ -209,10 +209,10 @@ public class ShowTimesController : ControllerBase
             Status = showTime.Status,
             BookedSeats = showTime.Reservations.Count(r => r.Status == "Booked")
         };
-        
+
         return Ok(ApiResponse<AdminShowTimeDto>.SuccessResponse("Showtime updated", dto));
     }
-    
+
     [HttpDelete("{id}")]
     public async Task<ActionResult<ApiResponse<string>>> DeleteShowTime(int id)
     {
@@ -221,11 +221,11 @@ public class ShowTimesController : ControllerBase
         {
             return NotFound(ApiResponse<string>.ErrorResponse("Showtime not found"));
         }
-        
+
         // Check if there are any bookings
         var hasBookings = await _context.SeatReservations
             .AnyAsync(r => r.ShowTimeId == id && r.Status == "Booked");
-        
+
         if (hasBookings)
         {
             showTime.Status = "Cancelled";
@@ -234,9 +234,9 @@ public class ShowTimesController : ControllerBase
         {
             _context.ShowTimes.Remove(showTime);
         }
-        
+
         await _context.SaveChangesAsync();
-        
+
         return Ok(ApiResponse<string>.SuccessResponse("Showtime deleted/cancelled"));
     }
 }

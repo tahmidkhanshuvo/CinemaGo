@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +8,7 @@ using CinemaGo.Api.Models;
 namespace CinemaGo.Api.Controllers.Admin;
 
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/[controller]")]
 public class ImdbController : ControllerBase
 {
@@ -29,12 +31,12 @@ public class ImdbController : ControllerBase
         {
             // Use IMDb suggestion API (unofficial but reliable)
             var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{query}.json");
-            
+
             if (!response.IsSuccessStatusCode)
                 return StatusCode(500, new { success = false, message = $"Failed to fetch: {response.StatusCode}" });
 
             var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
-            
+
             if (data?.d == null)
                 return Ok(new { success = true, data = new List<object>() });
 
@@ -60,12 +62,12 @@ public class ImdbController : ControllerBase
         try
         {
             var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{imdbId}.json");
-            
+
             if (!response.IsSuccessStatusCode)
                 return StatusCode(500, new { success = false, message = "Failed to fetch movie details" });
 
             var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
-            
+
             if (data?.d == null || data.d.Count == 0)
                 return NotFound(new { success = false, message = "Movie not found" });
 
@@ -95,12 +97,12 @@ public class ImdbController : ControllerBase
         {
             // Get movie details from IMDb suggestion API
             var response = await _httpClient.GetAsync($"https://v2.sg.media-imdb.com/suggestion/x/{request.ImdbId}.json");
-            
+
             if (!response.IsSuccessStatusCode)
                 return StatusCode(500, new { success = false, message = "Failed to fetch movie details from IMDb" });
 
             var data = await response.Content.ReadFromJsonAsync<IMDbApiResponse>();
-            
+
             if (data?.d == null || data.d.Count == 0)
                 return NotFound(new { success = false, message = "Movie not found on IMDb" });
 
@@ -120,7 +122,7 @@ public class ImdbController : ControllerBase
 
             // Parse runtime from id (approximate)
             // The id format is like "tt1234567" - we can't get runtime from this API
-            
+
             // Create movie entity
             var movie = new Movie
             {

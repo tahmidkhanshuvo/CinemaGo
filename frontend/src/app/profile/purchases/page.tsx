@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -30,7 +31,7 @@ export default function PurchasesPage() {
       try {
         const response = await api.getPurchases() as any;
         if (response.success && response.data) {
-          setPurchases(response.data);
+          setPurchases(response.data.ottPurchases ?? []);
         }
       } catch (error) {
         console.error('Error fetching purchases:', error);
@@ -53,17 +54,17 @@ export default function PurchasesPage() {
       ) : purchases.length === 0 ? (
         <div className="bg-gray-800 rounded-lg p-8 text-center">
           <p className="text-gray-400">No purchases yet</p>
-          <a href="/ott" className="text-red-500 hover:text-red-400 mt-2 inline-block">
+          <Link href="/ott" className="text-red-500 hover:text-red-400 mt-2 inline-block">
             Browse OTT movies
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
           {purchases.map((purchase) => (
             <div key={purchase.id} className="bg-gray-800 rounded-lg p-4 flex items-center gap-4">
               {purchase.moviePosterUrl && (
-                <img 
-                  src={purchase.moviePosterUrl} 
+                <img
+                  src={purchase.moviePosterUrl}
                   alt={purchase.movieTitle}
                   className="w-20 h-28 object-cover rounded"
                 />
@@ -76,12 +77,12 @@ export default function PurchasesPage() {
               </div>
               <div className="text-right">
                 <p className="text-white font-bold">${purchase.amount}</p>
-                <a 
+                <Link
                   href={`/watch/${purchase.movieId}`}
                   className="text-sm text-green-500 hover:text-green-400"
                 >
                   Watch Now →
-                </a>
+                </Link>
               </div>
             </div>
           ))}

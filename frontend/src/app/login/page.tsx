@@ -59,17 +59,17 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navbar />
-      
+
       <div className="flex justify-center items-center min-h-[80vh]">
         <div className="bg-gray-800 p-8 rounded-lg w-full max-w-md">
           <h2 className="text-3xl font-bold text-white mb-6 text-center">Login</h2>
-          
+
           {error && (
             <div className="bg-red-500/20 text-red-400 p-3 rounded mb-4">
               {error}
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="block text-gray-400 mb-2">Email</label>
@@ -81,7 +81,7 @@ export default function Login() {
                 required
               />
             </div>
-            
+
             <div className="mb-6">
               <label className="block text-gray-400 mb-2">Password</label>
               <input
@@ -92,7 +92,7 @@ export default function Login() {
                 required
               />
             </div>
-            
+
             <button
               type="submit"
               disabled={loading}
@@ -101,9 +101,9 @@ export default function Login() {
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
-          
+
           <p className="text-gray-400 mt-4 text-center">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="text-red-400 hover:underline">
               Register
             </Link>

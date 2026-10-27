@@ -2,284 +2,71 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import Navbar from '@/components/layout/Navbar';
-import api from '@/lib/api';
+import api, { type HomeData, type Movie } from '@/lib/api';
 
-interface Movie {
-  id: number;
-  title: string;
-  slug: string;
-  posterUrl?: string;
-  bannerUrl?: string;
-  ottPrice: number;
-  movieType: string;
-  description?: string;
-}
-
-interface HomeData {
-  featured: Movie[];
-  ottMovies: Movie[];
-  cinemaMovies: Movie[];
-  nowShowing: Movie[];
-  comingSoon: Movie[];
+function MovieShelf({ title, subtitle, movies, href }: { title: string; subtitle: string; movies: Movie[]; href: string }) {
+  if (!movies.length) return null;
+  return <section className="container mx-auto px-5 py-10">
+    <div className="mb-6 flex items-end justify-between gap-4">
+      <div><p className="mb-2 text-xs font-semibold uppercase tracking-[.2em] text-red-400">{subtitle}</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2></div>
+      <Link href={href} className="shrink-0 text-sm text-zinc-400 hover:text-white">Explore all ↗</Link>
+    </div>
+    <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
+      {movies.slice(0, 10).map(movie => <Link key={movie.id} href={`${href}/${movie.slug}`} className="group min-w-0">
+        <div className="relative mb-3 aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-zinc-800">
+          {movie.posterUrl ? <img loading="lazy" src={movie.posterUrl} alt={movie.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <div className="grid h-full place-items-center p-4 text-center text-zinc-500">{movie.title}</div>}
+          <span className="absolute bottom-3 left-3 rounded-md bg-black/75 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider">{href === '/cinema' ? 'In cinemas' : 'Watch at home'}</span>
+        </div>
+        <h3 className="truncate font-medium group-hover:text-red-400">{movie.title}</h3><p className="mt-1 truncate text-xs text-zinc-500">{movie.genre || (href === '/cinema' ? 'Find your showtime' : 'Your next movie night')}</p>
+      </Link>)}
+    </div>
+  </section>;
 }
 
 export default function Home() {
-  const [homeData, setHomeData] = useState<HomeData | null>(null);
+  const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentSlide, setCurrentSlide] = useState(0);
-
+  const [error, setError] = useState('');
+  const [slide, setSlide] = useState(0);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    const fetchHomeData = async () => {
-      try {
-        const response = await api.getHomeData();
-        if (response.success) {
-          setHomeData(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching home data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHomeData();
-  }, []);
-
-  // Auto-rotate carousel
+    let active = true;
+    setLoading(true); setError('');
+    api.getHomeData().then(res => { if (active && res.data) setData(res.data); }).catch(err => { if (active) setError(err.message || 'Unable to load the movie catalogue.'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [attempt]);
+  const heroes = data?.featured?.length ? data.featured : data?.cinemaMovies?.length ? data.cinemaMovies : data?.ottMovies || [];
+  const current = heroes[slide % (heroes.length || 1)];
   useEffect(() => {
-    if (!homeData?.cinemaMovies?.length) return;
-    
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % homeData.cinemaMovies.length);
-    }, 5000);
-    
+    if (heroes.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = setInterval(() => setSlide(value => value + 1), 7000);
     return () => clearInterval(timer);
-  }, [homeData?.cinemaMovies?.length]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-900">
-        <Navbar />
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="text-white text-2xl">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  const heroMovies = homeData?.cinemaMovies?.length > 0 
-    ? homeData.cinemaMovies 
-    : homeData?.ottMovies || [];
-
-  return (
-    <div className="min-h-screen bg-gray-900">
-      <Navbar />
-      
-      {/* Hero Carousel */}
-      <div className="relative h-[70vh] overflow-hidden">
-        {heroMovies.map((movie, index) => (
-          <div
-            key={movie.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              index === currentSlide ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            {/* Background Image */}
-            <div 
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ 
-                backgroundImage: movie.bannerUrl || movie.posterUrl 
-                  ? `url(${movie.bannerUrl || movie.posterUrl})` 
-                  : 'none',
-                filter: 'brightness(0.3)'
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-gray-900/70 to-transparent" />
-            
-            {/* Content */}
-            <div className="relative container mx-auto h-full flex items-center px-4">
-              <div className="max-w-2xl">
-                <span className="inline-block px-3 py-1 bg-red-600 text-white text-sm font-semibold rounded mb-4">
-                  {movie.movieType === 'CINEMA' ? 'NOW IN CINEMAS' : 'STREAMING'}
-                </span>
-                <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
-                  {movie.title}
-                </h1>
-                <p className="text-gray-300 text-lg mb-6 line-clamp-2">
-                  {movie.description || 'Experience the ultimate movie watching experience at CinemaGo'}
-                </p>
-                <div className="flex gap-4">
-                  {movie.movieType === 'CINEMA' ? (
-                    <Link 
-                      href={`/cinema/${movie.slug}`}
-                      className="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-semibold text-lg"
-                    >
-                      Book Now
-                    </Link>
-                  ) : (
-                    <Link 
-                      href={`/ott/${movie.slug}`}
-                      className="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-semibold text-lg"
-                    >
-                      Watch Now
-                    </Link>
-                  )}
-                  <Link 
-                    href="/ott"
-                    className="px-8 py-3 border-2 border-white hover:bg-white/10 rounded-lg font-semibold text-lg"
-                  >
-                    Browse All
-                  </Link>
-                </div>
-              </div>
-            </div>
+  }, [heroes.length]);
+  return <div className="min-h-screen bg-[#090b10] text-white">
+    <Navbar />
+    <main>
+      <section className="relative isolate min-h-[590px] overflow-hidden border-b border-white/10">
+        {current && <img key={current.id} src={current.bannerUrl || current.posterUrl} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover object-top opacity-55" />}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#090b10] via-[#090b10]/75 to-transparent" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#090b10] to-transparent" />
+        <div className="container mx-auto px-5 pb-20 pt-24 sm:pt-32">
+          <p className="mb-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[.25em] text-red-300"><span className="h-px w-8 bg-red-400" />A seat. A screen. A great story.</p>
+          <h1 className="max-w-3xl text-5xl font-semibold leading-[1.08] tracking-tight sm:text-7xl">{current?.title || 'Your next great movie starts here.'}</h1>
+          <p className="mt-6 max-w-xl text-base leading-relaxed text-zinc-300">{current?.description?.slice(0, 210) || 'Big-screen moments or a night on your own sofa. Discover what to watch, choose your seats, and make it a movie night.'}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href={current ? `${current.movieType === 'OTT' ? '/ott' : '/cinema'}/${current.slug}` : '/cinema'} className="rounded-full bg-red-500 px-7 py-3.5 text-sm font-semibold hover:bg-red-400">{current?.movieType === 'OTT' ? 'Watch movie' : 'Find tickets'} ↗</Link>
+            <Link href="/ott" className="rounded-full border border-white/25 bg-white/5 px-7 py-3.5 text-sm font-semibold hover:bg-white/10">Explore streaming</Link>
           </div>
-        ))}
-
-        {/* Carousel Dots */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-3">
-          {heroMovies.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`w-3 h-3 rounded-full transition-all ${
-                index === currentSlide ? 'bg-red-600 w-8' : 'bg-white/50'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Now Showing Section */}
-      {homeData?.nowShowing && homeData.nowShowing.length > 0 && (
-        <section className="container mx-auto py-12 px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold text-white">Now Showing</h2>
-            <Link href="/cinema" className="text-red-400 hover:text-red-300">
-              View All →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {homeData.nowShowing.slice(0, 5).map((movie) => (
-              <Link key={movie.id} href={`/cinema/${movie.slug}`} className="group">
-                <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-3">
-                  {movie.posterUrl ? (
-                    <Image
-                      src={movie.posterUrl}
-                      alt={movie.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                      <span className="text-gray-500">No Image</span>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <h3 className="text-white font-semibold truncate">{movie.title}</h3>
-                <p className="text-gray-400 text-sm">In Cinemas Now</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* OTT Movies Section */}
-      {homeData?.ottMovies && homeData.ottMovies.length > 0 && (
-        <section className="container mx-auto py-12 px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold text-white">Stream Online</h2>
-            <Link href="/ott" className="text-red-400 hover:text-red-300">
-              View All →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {homeData.ottMovies.slice(0, 12).map((movie) => (
-              <Link key={movie.id} href={`/ott/${movie.slug}`} className="group">
-                <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-2">
-                  {movie.posterUrl ? (
-                    <Image
-                      src={movie.posterUrl}
-                      alt={movie.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-800" />
-                  )}
-                  <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
-                    ${movie.ottPrice}
-                  </div>
-                </div>
-                <h3 className="text-white text-sm font-medium truncate">{movie.title}</h3>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Coming Soon Section */}
-      {homeData?.comingSoon && homeData.comingSoon.length > 0 && (
-        <section className="container mx-auto py-12 px-4">
-          <h2 className="text-3xl font-bold text-white mb-6">Coming Soon</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {homeData.comingSoon.map((movie) => (
-              <Link key={movie.id} href={`/ott/${movie.slug}`} className="group">
-                <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-3 opacity-75">
-                  {movie.posterUrl ? (
-                    <Image
-                      src={movie.posterUrl}
-                      alt={movie.title}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-800" />
-                  )}
-                  <div className="absolute inset-0 border-2 border-yellow-500/50 rounded-lg" />
-                </div>
-                <h3 className="text-white font-semibold truncate">{movie.title}</h3>
-                <p className="text-yellow-400 text-sm">Coming Soon</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Quick Links */}
-      <section className="bg-gray-800 py-16">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div className="p-6">
-              <div className="text-4xl mb-4">🎬</div>
-              <h3 className="text-xl font-bold text-white mb-2">Watch Online</h3>
-              <p className="text-gray-400">Stream thousands of movies anytime, anywhere</p>
-              <Link href="/ott" className="inline-block mt-4 text-red-400 hover:text-red-300">
-                Browse OTT →
-              </Link>
-            </div>
-            <div className="p-6">
-              <div className="text-4xl mb-4">🎟️</div>
-              <h3 className="text-xl font-bold text-white mb-2">Book Tickets</h3>
-              <p className="text-gray-400">Get the best seats for the latest blockbusters</p>
-              <Link href="/cinema" className="inline-block mt-4 text-red-400 hover:text-red-300">
-                Book Now →
-              </Link>
-            </div>
-            <div className="p-6">
-              <div className="text-4xl mb-4">👤</div>
-              <h3 className="text-xl font-bold text-white mb-2">My Account</h3>
-              <p className="text-gray-400">View your purchases and manage your profile</p>
-              <Link href="/profile" className="inline-block mt-4 text-red-400 hover:text-red-300">
-                View Profile →
-              </Link>
-            </div>
-          </div>
+          {heroes.length > 1 && <div className="mt-12 flex gap-2" aria-label="Featured movies">{heroes.map((movie, index) => <button key={movie.id} onClick={() => setSlide(index)} aria-label={`Show ${movie.title}`} aria-pressed={slide % heroes.length === index} className={`h-1.5 rounded-full ${slide % heroes.length === index ? 'w-10 bg-red-400' : 'w-5 bg-white/30'}`} />)}</div>}
         </div>
       </section>
-    </div>
-  );
+      <div className="container mx-auto grid gap-4 border-b border-white/10 px-5 py-6 text-sm text-zinc-400 sm:grid-cols-3"><p>01 <span className="ml-3 text-zinc-200">Discover something worth watching</span></p><p>02 <span className="ml-3 text-zinc-200">Pick your show. Choose your seat.</span></p><p>03 <span className="ml-3 text-zinc-200">Your tickets and library, together</span></p></div>
+      {loading && <div role="status" className="container mx-auto px-5 py-14"><p className="mb-6 text-zinc-400">Loading the catalogue… The server may take a moment to wake up.</p><div className="grid grid-cols-2 gap-4 sm:grid-cols-5">{Array.from({length:5}, (_,i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-white/5" />)}</div></div>}
+      {error && <div role="alert" className="container mx-auto px-5 py-12"><h2 className="text-xl font-semibold">The catalogue is taking a break</h2><p className="my-3 text-zinc-400">{error}</p><button onClick={() => setAttempt(value => value + 1)} className="rounded-full border border-white/20 px-6 py-2">Try again</button></div>}
+      {!loading && !error && data && <><MovieShelf title="Made for the big screen" subtitle="Now showing" movies={data.nowShowing || []} href="/cinema" /><MovieShelf title="Good stories. Anywhere." subtitle="Stream on CinemaGo" movies={data.ottMovies || []} href="/ott" /><MovieShelf title="On the horizon" subtitle="Coming soon" movies={data.comingSoon || []} href="/cinema" /></>}
+      {!loading && !error && !heroes.length && <p className="container mx-auto px-5 py-16 text-zinc-400">New titles are on the way. Check back soon.</p>}
+    </main>
+    <footer className="mt-10 border-t border-white/10"><div className="container mx-auto flex flex-wrap justify-between gap-4 px-5 py-8 text-sm text-zinc-500"><p>CinemaGo · Every night has a story.</p><p>Student project · Demo payments only</p></div></footer>
+  </div>;
 }
