@@ -129,6 +129,12 @@ try
         Check(BCrypt.Net.BCrypt.Verify("Isolated-new-password", changed!.PasswordHash) && !BCrypt.Net.BCrypt.Verify("Isolated-current-password", changed.PasswordHash) && JwtHelper.CredentialVersion(changed) != before, "password changes invalidate the previous credential version");
         Check((await db.Users.FindAsync(other.Id))!.PasswordHash == "not-a-login", "password changes preserve other accounts");
     }
+    await using (var db = Database())
+    {
+        Check(await DemoSchedule.EnsureUpcomingAsync(db) == 30, "opt-in demo schedule creates a bounded upcoming calendar");
+        Check(await DemoSchedule.EnsureUpcomingAsync(db) == 0, "repeated demo scheduling does not duplicate performances");
+        Check(await db.ShowTimes.AnyAsync(s => s.Id == pastShow.Id), "demo scheduling preserves existing history");
+    }
     Console.WriteLine("All PostgreSQL workflow checks passed.");
 }
 finally

@@ -94,6 +94,8 @@ using (var scope = app.Services.CreateScope())
     // This adds more movies, halls, and showtimes without deleting existing data
     if (builder.Configuration.GetValue<bool>("Database:SeedDemoData"))
         await initializer.SeedDataAsync(context);
+    if (builder.Configuration.GetValue<bool>("Database:EnsureDemoSchedule"))
+        await DemoSchedule.EnsureUpcomingAsync(context);
 }
 
 

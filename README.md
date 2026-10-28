@@ -65,6 +65,7 @@ The legacy reset route is restricted to authenticated administrators, Developmen
 | `ASPNETCORE_ENVIRONMENT` | API | Production on hosting; Development only locally |
 | `ASPNETCORE_URLS` | API | Listener; Docker exposes port 8080 |
 | `Database__SeedDemoData` | API | Explicit initial demo data, off by default |
+| `Database__EnsureDemoSchedule` | API | Optional rolling 30-day educational calendar in the dedicated Online demo screen; off by default |
 | `Bootstrap__AdminEmail`, `Bootstrap__AdminPassword` | API | Explicit first administrator for demo seeding |
 | `NEXT_PUBLIC_API_URL` | Frontend | Public API URL including `/api` |
 
@@ -109,6 +110,8 @@ npm run build
 The workflow checks create an explicitly qualified, uniquely named `cinemago_test_*` schema and remove only that schema afterward. They exercise concurrent booking, foreign-hall/duplicate seat rejection, price/payment consistency, cancellation isolation, unpublished-title restrictions, purchase ownership, concurrent OTT purchases, administrator role declarations, and password ownership/session invalidation. CI uses its own PostgreSQL service. Frontend lint currently reports legacy type/effect warnings; there are no lint errors.
 
 Public showtime discovery defaults to the next 200 scheduled performances of published movies in active halls. Explicit date filters still support historical lookup. Availability counts enabled seats. This keeps years of historical records out of the default booking view without deleting them.
+
+For an interactive educational deployment, `Database__EnsureDemoSchedule=true` fills missing dates for the next 30 days in **CinemaGo Demo Screen / Online demo**, using published catalogue titles and 16 demo seats. It runs at startup, checks existing dates under a database lock, preserves cancellations/history, and never modifies other halls. Disable or deactivate that demo screen for a real cinema. The schedule represents simulated bookings, not physical performances.
 
 Change an existing account's password under **My account → Account security**. The current password is required; the replacement must contain at least 12 characters and fit within bcrypt's 72-byte limit. Older sessions stop working after a change. The deployment introducing credential versions also requires existing sessions to sign in again. Rotate any credentials exposed in earlier repository history through their provider; removing them from current source does not revoke them.
 
