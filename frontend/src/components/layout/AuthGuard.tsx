@@ -39,8 +39,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // Check if user is admin
     const isAdmin = user?.role === 'Admin';
 
-    // If admin trying to access ANY non-admin page (including public), redirect to admin
-    if (isAdmin) {
+    // Administrators also need their account settings and public catalogue.
+    if (isAdmin && (pathname === '/login' || pathname === '/register')) {
       router.push('/admin');
       return;
     }

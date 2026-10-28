@@ -92,6 +92,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Bottom Actions */}
         <div className="mt-auto p-2 border-t border-gray-700">
+          <Link href="/profile" className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-gray-400 hover:bg-gray-700 hover:text-white" title="Account security">
+            <span aria-hidden="true">🔒</span>
+            {!isCollapsed && <span>Account security</span>}
+          </Link>
           <Link
             href="/"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white mb-1"
