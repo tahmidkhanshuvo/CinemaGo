@@ -82,6 +82,26 @@ public class ProfileController : ControllerBase
         return Ok(ApiResponse<UserDto>.SuccessResponse("Profile updated", userDto));
     }
     
+    [HttpPut("password")]
+    public async Task<ActionResult<ApiResponse<object>>> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        if (!int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
+            return Unauthorized(ApiResponse<object>.ErrorResponse("Unauthorized"));
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null || !user.IsActive)
+            return Unauthorized(ApiResponse<object>.ErrorResponse("Unauthorized"));
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            return BadRequest(ApiResponse<object>.ErrorResponse("Current password is incorrect."));
+        if (request.NewPassword.Length < 12 || System.Text.Encoding.UTF8.GetByteCount(request.NewPassword) > 72
+            || request.NewPassword != request.ConfirmPassword || request.CurrentPassword == request.NewPassword)
+            return BadRequest(ApiResponse<object>.ErrorResponse("Choose a different password of at least 12 characters (at most 72 UTF-8 bytes), and confirm it."));
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return Ok(ApiResponse<object>.SuccessResponse("Password changed. Sign in again on your devices."));
+    }
+
     [HttpGet("purchases")]
     public async Task<ActionResult<ApiResponse<ProfilePurchasesDto>>> GetPurchases()
     {

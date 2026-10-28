@@ -20,7 +20,7 @@ CinemaGo is an educational full-stack application by Tahmid Khan. Payments are s
 
 - A responsive movie homepage driven by the actual catalogue, with featured films, streaming titles, now-showing and upcoming shelves.
 - Movie search and details, cinema showtimes, hall seat maps and server-calculated ticket prices.
-- Account registration/sign-in, profile management, ticket history, streaming purchases and an owned library.
+- Account registration/sign-in, profile management, password changes, ticket history, streaming purchases and an owned library.
 - Purchase-checked playback URLs and movie ratings.
 - Administrator tools for movies, halls, showtimes and booking cancellation; every administrator controller requires the Admin role.
 
@@ -88,6 +88,7 @@ The legacy reset route is restricted to authenticated administrators, Developmen
 | `POST /api/auth/register`, `/api/auth/login` | Account access |
 | `GET /api/movies/home`, `/api/movies`, `/api/movies/{slug}` | Public catalogue |
 | `GET /api/cinema/showtimes`, `/api/cinema/showtimes/{id}` | Showtimes and seats |
+| `PUT /api/profile/password` | Change your own password with current-password verification; invalidate older sessions |
 | `POST /api/cinema/book` | Authenticated demo ticket booking |
 | `POST /api/ott/{movieId}/purchase` | Atomic demo streaming purchase |
 | `GET /api/ott/purchases`, `/api/ott/{movieId}/watch` | Owned library and authorized playback |
@@ -105,7 +106,11 @@ npm run lint
 npm run build
 ```
 
-The workflow checks create an explicitly qualified, uniquely named `cinemago_test_*` schema and remove only that schema afterward. They exercise concurrent booking, foreign-hall/duplicate seat rejection, price/payment consistency, cancellation isolation, unpublished-title restrictions, purchase ownership, concurrent OTT purchases and administrator role declarations. CI uses its own PostgreSQL service. Frontend lint currently reports legacy type/effect warnings; there are no lint errors.
+The workflow checks create an explicitly qualified, uniquely named `cinemago_test_*` schema and remove only that schema afterward. They exercise concurrent booking, foreign-hall/duplicate seat rejection, price/payment consistency, cancellation isolation, unpublished-title restrictions, purchase ownership, concurrent OTT purchases, administrator role declarations, and password ownership/session invalidation. CI uses its own PostgreSQL service. Frontend lint currently reports legacy type/effect warnings; there are no lint errors.
+
+Public showtime discovery defaults to the next 200 scheduled performances of published movies in active halls. Explicit date filters still support historical lookup. Availability counts enabled seats. This keeps years of historical records out of the default booking view without deleting them.
+
+Change an existing account's password under **My account → Account security**. The current password is required; the replacement must contain at least 12 characters and fit within bcrypt's 72-byte limit. Older sessions stop working after a change. The deployment introducing credential versions also requires existing sessions to sign in again. Rotate any credentials exposed in earlier repository history through their provider; removing them from current source does not revoke them.
 
 ## Deployment
 

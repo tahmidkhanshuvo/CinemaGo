@@ -96,6 +96,9 @@ export const api = {
   // Profile
   getProfile: () => fetchApi('/profile'),
 
+  changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
+    fetchApi('/profile/password', { method: 'PUT', body: JSON.stringify(data) }),
+
   updateProfile: (data: { fullName?: string; phone?: string }) =>
     fetchApi('/profile', { method: 'PUT', body: JSON.stringify(data) }),
 

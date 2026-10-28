@@ -3,6 +3,7 @@ using System.Reflection;
 using CinemaGo.Api.Controllers;
 using CinemaGo.Api.Data;
 using CinemaGo.Api.DTOs;
+using CinemaGo.Api.Helpers;
 using CinemaGo.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -29,7 +30,7 @@ try
 {
     await using var setup = Database();
     await setup.Database.ExecuteSqlRawAsync(setup.Database.GenerateCreateScript());
-    var buyer = new User { FullName = "Workflow buyer", Email = "buyer@example.test", PasswordHash = "not-a-login", Role = "User" };
+    var buyer = new User { FullName = "Workflow buyer", Email = "buyer@example.test", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Isolated-current-password"), Role = "User" };
     var other = new User { FullName = "Other buyer", Email = "other@example.test", PasswordHash = "not-a-login", Role = "User" };
     var film = new Movie { Title = "Workflow film", Slug = "workflow-film", MovieType = "CINEMA", IsPublished = true };
     var stream = new Movie { Title = "Workflow stream", Slug = "workflow-stream", MovieType = "OTT", IsPublished = true, OttPrice = 75, VideoUrl = "https://example.test/video.mp4" };
@@ -43,10 +44,23 @@ try
     setup.AddRange(category, otherCategory);
     await setup.SaveChangesAsync();
     var seats = Enumerable.Range(1, 3).Select(i => new HallSeat { HallId = hall.Id, CategoryId = category.Id, SeatLabel = "A" + i, RowLabel = "A", SeatNumber = i }).ToArray();
-    var wrongSeat = new HallSeat { HallId = otherHall.Id, CategoryId = otherCategory.Id, SeatLabel = "B1", RowLabel = "B", SeatNumber = 1 };
+    var wrongSeat = new HallSeat { HallId = otherHall.Id, CategoryId = otherCategory.Id, SeatLabel = "B1", RowLabel = "B", SeatNumber = 1, IsActive = false };
     var show = new ShowTime { MovieId = film.Id, HallId = hall.Id, ShowDate = DateTime.UtcNow.Date.AddDays(2), StartTime = TimeSpan.FromHours(18), EndTime = TimeSpan.FromHours(20), BasePrice = 100, CreatedAt = DateTime.UtcNow };
     setup.AddRange(seats); setup.AddRange(wrongSeat, show);
+    var pastShow = new ShowTime { MovieId = film.Id, HallId = hall.Id, ShowDate = DateTime.UtcNow.Date.AddDays(-1), StartTime = TimeSpan.FromHours(18), EndTime = TimeSpan.FromHours(20), BasePrice = 100, CreatedAt = DateTime.UtcNow };
+    var unavailableShow = new ShowTime { MovieId = film.Id, HallId = otherHall.Id, ShowDate = show.ShowDate, StartTime = show.StartTime, EndTime = show.EndTime, BasePrice = 100, CreatedAt = DateTime.UtcNow };
+    setup.AddRange(pastShow, unavailableShow);
     await setup.SaveChangesAsync();
+    await using (var db = Database())
+    {
+        var result = await new CinemaController(db).GetShowTimes();
+        var upcoming = ((result.Result as OkObjectResult)?.Value as ApiResponse<List<ShowTimeDto>>)?.Data;
+        Check(upcoming?.Count == 2 && upcoming.All(s=>s.Id != pastShow.Id), "public discovery defaults to upcoming showtimes");
+        Check(upcoming!.Single(s=>s.Id == unavailableShow.Id).AvailableSeats == 0, "available-seat counts exclude disabled seats");
+        var history = await new CinemaController(db).GetShowTimes(date: pastShow.ShowDate);
+        var historical = ((history.Result as OkObjectResult)?.Value as ApiResponse<List<ShowTimeDto>>)?.Data;
+        Check(historical?.Single().Id == pastShow.Id, "explicit historical date queries remain available");
+    }
 
     async Task<int> Book(int userId, params int[] ids)
     {
@@ -104,6 +118,17 @@ try
     }
     var adminControllers = typeof(CinemaController).Assembly.GetTypes().Where(t=>t.Namespace == "CinemaGo.Api.Controllers.Admin" && typeof(ControllerBase).IsAssignableFrom(t));
     Check(adminControllers.All(t=>t.GetCustomAttributes<AuthorizeAttribute>().Any(a=>a.Roles == "Admin")), "every administrator controller requires the Admin role");
+    await using (var db = Database())
+    {
+        var profile = SignedIn(new ProfileController(db), buyer.Id);
+        var before = JwtHelper.CredentialVersion(buyer);
+        Check((await profile.ChangePassword(new ChangePasswordRequest { CurrentPassword = "wrong", NewPassword = "Isolated-new-password", ConfirmPassword = "Isolated-new-password" })).Result is BadRequestObjectResult, "password changes require the current password");
+        Check((await profile.ChangePassword(new ChangePasswordRequest { CurrentPassword = "Isolated-current-password", NewPassword = "short", ConfirmPassword = "short" })).Result is BadRequestObjectResult, "short replacement passwords are rejected");
+        Check((await profile.ChangePassword(new ChangePasswordRequest { CurrentPassword = "Isolated-current-password", NewPassword = "Isolated-new-password", ConfirmPassword = "Isolated-new-password" })).Result is OkObjectResult, "owners can change their own password");
+        var changed = await db.Users.FindAsync(buyer.Id);
+        Check(BCrypt.Net.BCrypt.Verify("Isolated-new-password", changed!.PasswordHash) && !BCrypt.Net.BCrypt.Verify("Isolated-current-password", changed.PasswordHash) && JwtHelper.CredentialVersion(changed) != before, "password changes invalidate the previous credential version");
+        Check((await db.Users.FindAsync(other.Id))!.PasswordHash == "not-a-login", "password changes preserve other accounts");
+    }
     Console.WriteLine("All PostgreSQL workflow checks passed.");
 }
 finally

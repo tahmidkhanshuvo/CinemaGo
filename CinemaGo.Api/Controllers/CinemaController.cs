@@ -28,7 +28,7 @@ public class CinemaController : ControllerBase
         var query = _context.ShowTimes
             .Include(s => s.Movie)
             .Include(s => s.Hall)
-            .Where(s => s.Status != "Cancelled");
+            .Where(s => s.Status == "Scheduled" && s.Movie.IsPublished && s.Hall.IsActive);
 
         if (movieId.HasValue)
             query = query.Where(s => s.MovieId == movieId.Value);
@@ -41,6 +41,15 @@ public class CinemaController : ControllerBase
             var dateEnd = dateValue.AddDays(1);
             query = query.Where(s => s.ShowDate >= dateValue && s.ShowDate < dateEnd);
         }
+        else
+        {
+            var now = DateTime.UtcNow;
+            var today = now.Date;
+            var time = now.TimeOfDay;
+            query = query.Where(s => s.ShowDate > today || (s.ShowDate == today && s.StartTime > time));
+        }
+        // Public discovery does not download years of historical seed data.
+        query = query.OrderBy(s => s.ShowDate).ThenBy(s => s.StartTime).Take(200);
 
         // Get showtimes with available seats count
         var showTimeIds = await query.Select(s => s.Id).ToListAsync();
@@ -50,9 +59,10 @@ public class CinemaController : ControllerBase
             .Select(g => new { ShowTimeId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ShowTimeId, x => x.Count);
 
-        var hallSeats = await _context.Halls
-            .Where(h => query.Select(s => s.HallId).Contains(h.Id))
-            .Select(h => new { HallId = h.Id, TotalSeats = h.TotalRows * h.TotalSeatsPerRow })
+        var hallSeats = await _context.HallSeats
+            .Where(s => s.IsActive && query.Select(show => show.HallId).Contains(s.HallId))
+            .GroupBy(s => s.HallId)
+            .Select(group => new { HallId = group.Key, TotalSeats = group.Count() })
             .ToDictionaryAsync(x => x.HallId, x => x.TotalSeats);
 
         var showTimes = await query
@@ -81,7 +91,7 @@ public class CinemaController : ControllerBase
         {
             var totalSeats = hallSeats.GetValueOrDefault(st.HallId, 0);
             var reserved = reservedCounts.GetValueOrDefault(st.Id, 0);
-            st.AvailableSeats = totalSeats - reserved;
+            st.AvailableSeats = Math.Max(0, totalSeats - reserved);
         }
 
         return Ok(ApiResponse<List<ShowTimeDto>>.SuccessResponse("Showtimes fetched", showTimes));

@@ -42,6 +42,18 @@ public class AuthResponse
     public string Token { get; set; } = string.Empty;
 }
 
+public class ChangePasswordRequest
+{
+    [Required]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required, MinLength(12), MaxLength(72)]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required, Compare(nameof(NewPassword))]
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+
 public class UserDto
 {
     public int Id { get; set; }

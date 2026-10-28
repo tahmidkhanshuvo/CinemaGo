@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
 using CinemaGo.Api.Models;
 
@@ -8,6 +9,8 @@ namespace CinemaGo.Api.Helpers;
 
 public static class JwtHelper
 {
+    public static string CredentialVersion(User user) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(user.PasswordHash)));
+
     public static string GenerateToken(User user, string secretKey, int expiryHours = 24)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -18,7 +21,8 @@ public static class JwtHelper
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(ClaimTypes.Role, user.Role)
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("credential_version", CredentialVersion(user))
         };
         
         var token = new JwtSecurityToken(

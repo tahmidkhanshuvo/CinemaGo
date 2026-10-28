@@ -6,6 +6,7 @@ import Navbar from '@/components/layout/Navbar';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import Link from 'next/link';
+import ChangePasswordForm from '@/components/account/ChangePasswordForm';
 
 interface Purchase {
   id: number;
@@ -51,7 +52,6 @@ export default function ProfilePage() {
     const fetchData = async () => {
       try {
         const profileRes = await api.getPurchases() as any;
-        console.log('Profile response:', profileRes);
         if (profileRes.success && profileRes.data) {
           if (Array.isArray(profileRes.data.ottPurchases)) {
             setPurchases(profileRes.data.ottPurchases);
@@ -119,7 +119,7 @@ export default function ProfilePage() {
       
       <div className="container mx-auto py-8 px-4">
         {/* Tabs */}
-        <div className="flex gap-4 mb-8">
+        <div className="flex flex-wrap gap-4 mb-8">
           <button
             onClick={() => setActiveTab('profile')}
             className={`px-6 py-2 rounded-lg font-semibold ${
@@ -268,6 +268,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+            <ChangePasswordForm />
           </div>
         ) : loading ? (
           <div className="text-white text-2xl">Loading...</div>

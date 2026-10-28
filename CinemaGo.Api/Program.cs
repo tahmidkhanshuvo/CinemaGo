@@ -53,7 +53,8 @@ builder.Services.AddAuthentication(options =>
             var id = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             var database = context.HttpContext.RequestServices.GetRequiredService<CinemaDbContext>();
             var user = int.TryParse(id, out var userId) ? await database.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId) : null;
-            if (user == null || !user.IsActive || user.Role != context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value)
+            if (user == null || !user.IsActive || user.Role != context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                || context.Principal?.FindFirst("credential_version")?.Value != CinemaGo.Api.Helpers.JwtHelper.CredentialVersion(user))
                 context.Fail("This account or role is no longer active.");
         }
     };
