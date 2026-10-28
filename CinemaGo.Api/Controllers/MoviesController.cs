@@ -28,7 +28,7 @@ public class MoviesController : ControllerBase
         var homeData = new HomeDataDto
         {
             Featured = movies.Where(m => m.IsFeatured).Take(10).Select(MapToDto).ToList(),
-            OttMovies = movies.Where(m => m.MovieType == "OTT" || m.MovieType == "BOTH").Take(10).Select(MapToDto).ToList(),
+            OttMovies = movies.Where(m => m.MovieType == "OTT" || m.MovieType == "BOTH").OrderByDescending(m => !string.IsNullOrWhiteSpace(m.VideoUrl)).Take(10).Select(MapToDto).ToList(),
             CinemaMovies = movies.Where(m => m.MovieType == "CINEMA" || m.MovieType == "BOTH").Take(10).Select(MapToDto).ToList(),
             NowShowing = movies.Where(m => m.MovieType == "CINEMA" || m.MovieType == "BOTH").Take(10).Select(MapToDto).ToList(),
             ComingSoon = movies.Where(m => m.ReleaseDate != null && m.ReleaseDate > DateTime.UtcNow).Take(10).Select(MapToDto).ToList()
@@ -83,6 +83,7 @@ public class MoviesController : ControllerBase
                 BannerUrl = m.BannerUrl,
                 TrailerUrl = m.TrailerUrl,
                 VideoUrl = null,
+                IsStreamAvailable = m.VideoUrl != null && m.VideoUrl != "",
                 MovieType = m.MovieType,
                 OttPrice = m.OttPrice,
                 IsPublished = m.IsPublished,
@@ -98,14 +99,14 @@ public class MoviesController : ControllerBase
     public async Task<ActionResult<ApiResponse<MovieDetailDto>>> GetMovieBySlug(string slug)
     {
         // Try to find by slug first
-        var movie = await _context.Movies
+        var movie = await _context.Movies.Where(m => m.IsPublished)
             .Include(m => m.Ratings)
             .FirstOrDefaultAsync(m => m.Slug == slug);
 
         // If not found by slug, try to find by ID (if slug is a number)
         if (movie == null && int.TryParse(slug, out int movieId))
         {
-            movie = await _context.Movies
+            movie = await _context.Movies.Where(m => m.IsPublished)
                 .Include(m => m.Ratings)
                 .FirstOrDefaultAsync(m => m.Id == movieId);
         }
@@ -113,7 +114,7 @@ public class MoviesController : ControllerBase
         // If still not found, try partial slug match
         if (movie == null)
         {
-            movie = await _context.Movies
+            movie = await _context.Movies.Where(m => m.IsPublished)
                 .Include(m => m.Ratings)
                 .FirstOrDefaultAsync(m => m.Slug.Contains(slug));
         }
@@ -122,7 +123,7 @@ public class MoviesController : ControllerBase
         if (movie == null)
         {
             var lowerSlug = slug.ToLower();
-            movie = await _context.Movies
+            movie = await _context.Movies.Where(m => m.IsPublished)
                 .Include(m => m.Ratings)
                 .FirstOrDefaultAsync(m => m.Title.ToLower().Contains(lowerSlug));
         }
@@ -174,6 +175,7 @@ public class MoviesController : ControllerBase
             BannerUrl = movie.BannerUrl ?? "",
             TrailerUrl = movie.TrailerUrl ?? "",
             VideoUrl = "",
+            IsStreamAvailable = !string.IsNullOrWhiteSpace(movie.VideoUrl),
             MovieType = movie.MovieType,
             OttPrice = movie.OttPrice,
             IsPublished = movie.IsPublished,
@@ -205,6 +207,7 @@ public class MoviesController : ControllerBase
             BannerUrl = m.BannerUrl,
             TrailerUrl = m.TrailerUrl,
             VideoUrl = null,
+            IsStreamAvailable = !string.IsNullOrWhiteSpace(m.VideoUrl),
             MovieType = m.MovieType,
             OttPrice = m.OttPrice,
             IsPublished = m.IsPublished,

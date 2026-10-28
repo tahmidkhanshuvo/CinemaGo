@@ -1,6 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export interface Movie {
+  isStreamAvailable?: boolean;
   id: number; title: string; slug: string; movieType: string; ottPrice: number;
   posterUrl?: string; bannerUrl?: string; description?: string; genre?: string; durationMinutes?: number;
 }

@@ -66,6 +66,7 @@ public class UserDto
 // Movie DTOs
 public class MovieDto
 {
+    public bool IsStreamAvailable { get; set; }
     public int Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
@@ -285,6 +286,7 @@ public class OttPurchaseDto
 
 public class WatchDto
 {
+    public string Description { get; set; } = string.Empty;
     public int MovieId { get; set; }
     public string MovieTitle { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;

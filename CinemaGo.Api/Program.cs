@@ -96,6 +96,8 @@ using (var scope = app.Services.CreateScope())
         await initializer.SeedDataAsync(context);
     if (builder.Configuration.GetValue<bool>("Database:EnsureDemoSchedule"))
         await DemoSchedule.EnsureUpcomingAsync(context);
+    if (builder.Configuration.GetValue<bool>("Database:SeedOpenMovieDemo"))
+        await OpenMovieDemo.EnsureAsync(context);
 }
 
 

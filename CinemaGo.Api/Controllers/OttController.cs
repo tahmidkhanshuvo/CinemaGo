@@ -43,6 +43,9 @@ public class OttController : ControllerBase
         }
 
         // Check if already purchased
+        if (string.IsNullOrWhiteSpace(movie.VideoUrl))
+            return BadRequest(ApiResponse<OttPurchaseDto>.ErrorResponse("Streaming is not available for this title yet."));
+
         var existingPurchase = await _context.OttPurchases
             .FirstOrDefaultAsync(p => p.UserId == userId && p.MovieId == movieId);
 
@@ -143,8 +146,12 @@ public class OttController : ControllerBase
 
         var movie = await _context.Movies.FindAsync(movieId);
 
+        if (movie == null || string.IsNullOrWhiteSpace(movie.VideoUrl))
+            return NotFound(ApiResponse<WatchDto>.ErrorResponse("This stream is currently unavailable."));
+
         var watchDto = new WatchDto
         {
+            Description = movie.Description ?? "",
             MovieId = movieId,
             MovieTitle = movie?.Title ?? "",
             Title = movie?.Title ?? "",

@@ -29,8 +29,9 @@ export default function Catalogue({ type }: { type: 'OTT' | 'CINEMA' }) {
     const matches = movies.filter(movie => `${movie.title} ${movie.genre || ''}`.toLowerCase().includes(search.toLowerCase().trim()) && (!genre || (movie.genre || '').split(',').map(value => value.trim()).includes(genre)));
     if (sort === 'title') matches.sort((a,b) => a.title.localeCompare(b.title));
     if (sort === 'price') matches.sort((a,b) => a.ottPrice - b.ottPrice);
+    if (sort === 'featured' && type === 'OTT') matches.sort((a,b) => Number(Boolean(b.isStreamAvailable)) - Number(Boolean(a.isStreamAvailable)));
     return matches;
-  }, [movies, search, genre, sort]);
+  }, [movies, search, genre, sort, type]);
   const pages = Math.max(1, Math.ceil(filtered.length / 20));
   const currentPage = Math.min(page, pages);
   const root = type === 'OTT' ? '/ott' : '/cinema';
@@ -49,7 +50,7 @@ export default function Catalogue({ type }: { type: 'OTT' | 'CINEMA' }) {
         <p className="mb-6 text-sm text-zinc-500">{filtered.length} {filtered.length === 1 ? 'title' : 'titles'} to explore</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">{filtered.slice((currentPage-1)*20,currentPage*20).map(movie=><Link key={movie.id} href={`${root}/${movie.slug}`} className="group min-w-0">
           <div className="mb-3 aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-zinc-800">{movie.posterUrl ? <img loading="lazy" src={movie.posterUrl} alt={movie.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <div className="grid h-full place-items-center p-4 text-center text-zinc-500">{movie.title}</div>}</div>
-          <h2 className="truncate font-medium group-hover:text-red-400">{movie.title}</h2><p className="mt-2 truncate text-xs text-zinc-500">{movie.genre || 'Explore the story'}</p>{type === 'OTT' && <p className="mt-2 text-sm text-red-300">${movie.ottPrice.toFixed(2)}</p>}
+          <h2 className="truncate font-medium group-hover:text-red-400">{movie.title}</h2><p className="mt-2 truncate text-xs text-zinc-500">{movie.genre || 'Explore the story'}</p>{type === 'OTT' && <p className="mt-2 text-sm text-red-300">{!movie.isStreamAvailable ? "Stream not available yet" : movie.ottPrice === 0 ? "Free demo" : `$${movie.ottPrice.toFixed(2)}`}</p>}
         </Link>)}</div>
         {!filtered.length && <div className="py-16 text-center"><h2 className="text-xl">No matches just yet.</h2><p className="my-4 text-zinc-400">Try a different title or broaden your genre filter.</p><button className="text-red-300" onClick={()=>{setSearch('');setGenre('');setPage(1);}}>Clear filters</button></div>}
         {pages > 1 && <nav aria-label="Catalogue pages" className="mt-12 flex items-center justify-center gap-6 text-sm"><button disabled={currentPage<=1} onClick={()=>setPage(currentPage-1)} className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-30">Previous</button><span className="text-zinc-400">Page {currentPage} of {pages}</span><button disabled={currentPage>=pages} onClick={()=>setPage(currentPage+1)} className="rounded-full border border-white/20 px-5 py-2 disabled:opacity-30">Next</button></nav>}

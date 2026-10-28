@@ -5,8 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
+import api from '@/lib/api';
 
 interface Movie {
+  isStreamAvailable: boolean;
   id: number;
   title: string;
   slug: string;
@@ -37,7 +39,8 @@ export default function MovieDetailPage() {
   const [movie, setMovie] = useState<Movie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [user, setUser] = useState<any>(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
   const [rating, setRating] = useState(0);
   const [purchased, setPurchased] = useState(false);
 
@@ -45,10 +48,6 @@ export default function MovieDetailPage() {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-          setUser(JSON.parse(userStr));
-        }
 
         const headers: any = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -81,29 +80,27 @@ export default function MovieDetailPage() {
   }, [slug]);
 
   const handlePurchase = async () => {
+    if (!movie?.isStreamAvailable || purchasing) return;
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
 
+    setPurchasing(true);
+    setActionMessage('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ott/${movie?.id}/purchase`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
+      const data = await api.purchaseMovie(movie.id);
       if (data.success) {
         setPurchased(true);
-        alert('Purchase successful! You can now watch the movie.');
+        setActionMessage('Demo purchase saved. No payment was collected. You can now watch the clip.');
       } else {
-        alert(data.message || 'Purchase failed');
+        setActionMessage(data.message || 'Purchase failed');
       }
     } catch (err) {
-      alert('Purchase failed');
+      setActionMessage(err instanceof Error ? err.message : 'Purchase failed');
+    } finally {
+      setPurchasing(false);
     }
   };
 
@@ -128,7 +125,7 @@ export default function MovieDetailPage() {
         setRating(score);
       }
     } catch (err) {
-      alert('Failed to submit rating');
+      setActionMessage('Failed to submit rating. Please try again.');
     }
   };
 
@@ -193,7 +190,7 @@ export default function MovieDetailPage() {
             <h1 className="text-4xl font-bold mb-4">{movie.title}</h1>
             
             <div className="flex flex-wrap gap-4 mb-6 text-gray-300">
-              <span>{movie.durationMinutes} min</span>
+              <span>{movie.durationMinutes > 0 ? `${movie.durationMinutes} min` : 'Short sample'}</span>
               <span>{movie.language}</span>
               <span>{movie.ageRating}</span>
               {movie.imDbLikeScore && (
@@ -202,15 +199,17 @@ export default function MovieDetailPage() {
             </div>
 
             <p className="text-gray-300 mb-6">{movie.description}</p>
+            {actionMessage && <p role="status" className="mb-5 rounded-lg border border-white/15 p-4 text-sm text-zinc-200">{actionMessage}</p>}
 
             {/* Actions */}
             <div className="flex gap-4 mb-8">
               {isOtt && !purchased && (
                 <button
                   onClick={handlePurchase}
-                  className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                  disabled={!movie.isStreamAvailable || purchasing}
+                  className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
                 >
-                  Buy for ${movie.ottPrice}
+                  {!movie.isStreamAvailable ? 'Stream not available yet' : purchasing ? 'Saving…' : movie.ottPrice === 0 ? 'Add free demo to library' : `Demo purchase · $${movie.ottPrice}`}
                 </button>
               )}
               {isOtt && purchased && (

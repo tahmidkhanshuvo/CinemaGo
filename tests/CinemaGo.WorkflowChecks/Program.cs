@@ -111,7 +111,7 @@ try
     {
         Check(await db.OttPurchases.CountAsync() == 1 && await db.Payments.CountAsync(p=>p.PaymentType == "OTT") == 1, "OTT payment and purchase are committed together");
         Check((await SignedIn(new OttController(db), buyer.Id).WatchMovie(stream.Id)).Result is OkObjectResult, "purchased stream is available to its owner");
-        var hybrid = new Movie { Title = "Both formats", Slug = "both-formats", MovieType = "BOTH", IsPublished = true, OttPrice = 40 };
+        var hybrid = new Movie { Title = "Both formats", Slug = "both-formats", MovieType = "BOTH", IsPublished = true, OttPrice = 40, VideoUrl = "https://example.test/hybrid.mp4" };
         db.Movies.Add(hybrid);
         await db.SaveChangesAsync();
         Check(await Purchase(hybrid.Id) == 200, "titles available in both formats retain streaming purchases");
@@ -134,6 +134,14 @@ try
         Check(await DemoSchedule.EnsureUpcomingAsync(db) == 30, "opt-in demo schedule creates a bounded upcoming calendar");
         Check(await DemoSchedule.EnsureUpcomingAsync(db) == 0, "repeated demo scheduling does not duplicate performances");
         Check(await db.ShowTimes.AnyAsync(s => s.Id == pastShow.Id), "demo scheduling preserves existing history");
+    }
+    await using (var db = Database())
+    {
+        var missingStream = new Movie { Title = "No media", Slug = "no-media", MovieType = "OTT", IsPublished = true };
+        db.Movies.Add(missingStream); await db.SaveChangesAsync();
+        Check(await Purchase(missingStream.Id) == 400, "titles without media cannot be purchased");
+        Check((await new MoviesController(db).GetMovieBySlug(hidden.Slug)).Result is NotFoundObjectResult, "unpublished movie details remain private");
+        Check(await OpenMovieDemo.EnsureAsync(db) && !await OpenMovieDemo.EnsureAsync(db), "open-movie demo content is provisioned idempotently");
     }
     Console.WriteLine("All PostgreSQL workflow checks passed.");
 }
