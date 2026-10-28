@@ -105,6 +105,7 @@ coverage/
 
 # Media files
 *.mp4
+!frontend/public/demo/big-buck-bunny-clip.mp4
 *.avi
 *.mov
 *.mkv
